@@ -131,12 +131,20 @@
         <span x-show="serviceStats.failed > 0" class="ml-auto bg-panel-red text-white text-xs px-1.5 py-0.5 rounded-full" x-text="serviceStats.failed"></span>
       </button>
 
-      <button @click="activeTab='deploy'; loadPorts()" :class="{'active': activeTab==='deploy'}"
+      <button @click="activeTab='deploy'; loadPorts(); loadDomains()" :class="{'active': activeTab==='deploy'}"
         class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-panel-muted cursor-pointer">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path d="M12 5v14M5 12l7-7 7 7"/>
         </svg>
         Déployer
+      </button>
+
+      <button @click="activeTab='domains'; loadDomains()" :class="{'active': activeTab==='domains'}"
+        class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-panel-muted cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/>
+        </svg>
+        Domaines
       </button>
 
       <button @click="activeTab='import'; scanApps()" :class="{'active': activeTab==='import'}"
@@ -504,24 +512,70 @@
               x-text="(deployForm.parent_path || '/opt/..') + '/' + (deployForm.app_name || 'mon-app')"></p>
           </div>
 
-          <!-- Domaine -->
-          <div>
-            <label class="block text-xs text-panel-muted mb-1.5 uppercase tracking-wider">Domaine / Sous-domaine</label>
-            <div class="flex gap-2">
-              <input x-model="deployForm.domain" placeholder="support.i-tracker.online"
-                class="flex-1 bg-panel-bg border border-panel-border rounded-lg px-3 py-2.5 text-sm font-mono text-panel-text placeholder-panel-muted focus:outline-none focus:border-panel-accent transition-colors"/>
-              <button type="button" @click="loadDomains()"
-                class="px-3 py-2.5 bg-panel-bg border border-panel-border rounded-lg text-xs text-panel-muted hover:text-panel-accent transition-colors whitespace-nowrap">
-                Domaines Nginx
-              </button>
+          <!-- Domaine — sélecteur -->
+          <div x-data="{ domainOpen: false }">
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="text-xs text-panel-muted uppercase tracking-wider">Domaine / Sous-domaine</label>
+              <a @click.prevent="activeTab='domains'; loadDomains()" href="#"
+                class="text-xs text-panel-accent hover:text-white transition-colors">Gérer les domaines →</a>
             </div>
-            <!-- Suggestions de domaines -->
-            <div x-show="nginxDomains.length" class="flex flex-wrap gap-1.5 mt-2">
-              <template x-for="d in nginxDomains" :key="d">
-                <button type="button" @click="deployForm.domain=d"
-                  :class="deployForm.domain===d ? 'bg-panel-accent/20 text-panel-accent border-panel-accent' : 'bg-panel-bg text-panel-muted border-panel-border'"
-                  class="px-2 py-1 rounded text-xs font-mono border hover:border-panel-accent transition-colors" x-text="d"></button>
+
+            <!-- Trigger -->
+            <button type="button" @click="domainOpen=!domainOpen"
+              class="w-full flex items-center justify-between bg-panel-bg border rounded-lg px-3 py-2.5 text-sm font-mono transition-colors"
+              :class="domainOpen ? 'border-panel-accent' : 'border-panel-border'">
+              <span :class="deployForm.domain ? 'text-panel-accent' : 'text-panel-muted'"
+                x-text="deployForm.domain || 'Sélectionner un domaine…'"></span>
+              <svg class="w-4 h-4 text-panel-muted transition-transform" :class="domainOpen && 'rotate-180'"
+                fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M19 9l-7 7-7-7"/>
+              </svg>
+            </button>
+
+            <!-- Dropdown panel -->
+            <div x-show="domainOpen" x-cloak @click.outside="domainOpen=false"
+              class="relative z-20 mt-1 bg-panel-surface border border-panel-border rounded-lg shadow-xl overflow-hidden fade-in">
+
+              <!-- Loading -->
+              <div x-show="domainsLoading" class="px-4 py-3 text-xs text-panel-muted text-center">Chargement…</div>
+
+              <!-- Domains list -->
+              <template x-for="d in nginxDomains" :key="d.name">
+                <button type="button" @click="deployForm.domain=d.name; domainOpen=false"
+                  class="w-full flex items-center justify-between px-4 py-3 hover:bg-panel-bg transition-colors border-b border-panel-border/50 last:border-0"
+                  :class="deployForm.domain===d.name ? 'bg-panel-accent/10' : ''">
+                  <div class="flex items-center gap-3 min-w-0">
+                    <span class="w-2 h-2 rounded-full flex-shrink-0"
+                      :class="d.enabled ? 'bg-panel-green' : 'bg-panel-muted'"></span>
+                    <div class="text-left min-w-0">
+                      <div class="text-sm font-mono truncate"
+                        :class="deployForm.domain===d.name ? 'text-panel-accent' : 'text-panel-text'"
+                        x-text="d.name"></div>
+                      <div class="text-xs text-panel-muted mt-0.5" x-show="d.apps && d.apps.length">
+                        <span x-text="d.apps.length + ' app(s): ' + d.apps.join(', ')"></span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 flex-shrink-0 ml-3">
+                    <span x-show="d.ssl" class="px-1.5 py-0.5 rounded text-xs bg-green-900/20 text-panel-green border border-green-900/30">SSL</span>
+                    <span x-show="deployForm.domain===d.name" class="text-panel-accent text-sm">✓</span>
+                  </div>
+                </button>
               </template>
+
+              <!-- Empty -->
+              <div x-show="!domainsLoading && nginxDomains.length===0"
+                class="px-4 py-3 text-xs text-panel-muted text-center">
+                Aucun domaine Nginx détecté
+              </div>
+
+              <!-- Divider + custom input -->
+              <div class="border-t border-panel-border px-3 py-2.5 bg-panel-bg">
+                <p class="text-xs text-panel-muted mb-1.5">Ou saisir manuellement :</p>
+                <input x-model="deployForm.domain" placeholder="nouveau.domaine.com"
+                  @keydown.enter.prevent="domainOpen=false"
+                  class="w-full bg-panel-surface border border-panel-border rounded px-2.5 py-1.5 text-xs font-mono text-panel-text placeholder-panel-muted focus:outline-none focus:border-panel-accent transition-colors"/>
+              </div>
             </div>
           </div>
 
@@ -650,6 +704,110 @@
         </div>
       </div>
 
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         TAB : DOMAINES
+    ══════════════════════════════════════════ -->
+    <div x-show="activeTab==='domains'" x-cloak class="p-6 space-y-4 fade-in">
+
+      <!-- Header actions -->
+      <div class="flex items-center justify-between">
+        <p class="text-sm text-panel-muted">Domaines détectés dans <span class="font-mono text-panel-accent">/etc/nginx/sites-available</span></p>
+        <div class="flex items-center gap-2">
+          <button @click="nginxTest()" :disabled="nginxTesting"
+            class="flex items-center gap-2 px-3 py-2 bg-panel-bg border border-panel-border text-panel-muted hover:text-panel-yellow hover:border-panel-yellow rounded-lg text-xs transition-colors disabled:opacity-50">
+            <svg :class="nginxTesting && 'animate-spin'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span x-text="nginxTesting ? 'Test…' : 'nginx -t'"></span>
+          </button>
+          <button @click="nginxReload()" :disabled="nginxReloading"
+            class="flex items-center gap-2 px-3 py-2 bg-panel-bg border border-panel-green text-panel-green hover:bg-green-900/20 rounded-lg text-xs transition-colors disabled:opacity-50">
+            <svg :class="nginxReloading && 'animate-spin'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span x-text="nginxReloading ? 'Rechargement…' : 'Reload Nginx'"></span>
+          </button>
+          <button @click="loadDomains()" :disabled="domainsLoading"
+            class="flex items-center gap-2 px-3 py-2 bg-panel-bg border border-panel-border text-panel-muted hover:text-white rounded-lg text-xs transition-colors disabled:opacity-50">
+            <svg :class="domainsLoading && 'animate-spin'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span x-text="domainsLoading ? 'Scan…' : '↺ Actualiser'"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- nginx test output -->
+      <div x-show="nginxTestOutput" x-cloak class="fade-in">
+        <div class="rounded-lg border p-3"
+          :class="nginxTestOk ? 'border-panel-green bg-green-900/10' : 'border-panel-red bg-red-900/10'">
+          <pre class="text-xs font-mono" :class="nginxTestOk ? 'text-panel-green' : 'text-panel-red'"
+            x-text="nginxTestOutput"></pre>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div x-show="domainsLoading" class="text-center py-12 text-panel-muted text-sm">Analyse de Nginx…</div>
+
+      <!-- Domains grid -->
+      <div x-show="!domainsLoading" class="grid grid-cols-1 gap-3">
+        <template x-for="d in nginxDomains" :key="d.name">
+          <div class="card bg-panel-surface border border-panel-border rounded-xl p-5">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex-1 min-w-0">
+                <!-- Domain name + badges -->
+                <div class="flex items-center gap-2 flex-wrap mb-3">
+                  <span class="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    :class="d.enabled ? 'bg-panel-green' : 'bg-panel-muted'"></span>
+                  <h3 class="font-mono text-base font-semibold text-panel-accent" x-text="d.name"></h3>
+                  <span x-show="d.ssl"
+                    class="px-1.5 py-0.5 rounded text-xs bg-green-900/20 text-panel-green border border-green-900/30">🔒 SSL</span>
+                  <span x-show="!d.enabled"
+                    class="px-1.5 py-0.5 rounded text-xs bg-yellow-900/20 text-panel-yellow border border-yellow-900/30">Désactivé</span>
+                </div>
+
+                <!-- Conf path -->
+                <div class="flex items-center gap-2 mb-3">
+                  <svg class="w-3.5 h-3.5 text-panel-muted flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  </svg>
+                  <span class="text-xs font-mono text-panel-muted" x-text="d.conf_path"></span>
+                </div>
+
+                <!-- Apps déployées sur ce domaine -->
+                <div x-show="d.apps && d.apps.length > 0">
+                  <p class="text-xs text-panel-muted mb-1.5">Applications déployées :</p>
+                  <div class="flex flex-wrap gap-1.5">
+                    <template x-for="app in d.apps" :key="app">
+                      <span class="px-2 py-0.5 rounded-full text-xs font-mono bg-panel-bg border border-panel-border text-panel-text" x-text="app"></span>
+                    </template>
+                  </div>
+                </div>
+                <div x-show="!d.apps || d.apps.length === 0"
+                  class="text-xs text-panel-muted italic">Aucune application panel déployée sur ce domaine</div>
+              </div>
+
+              <!-- Actions -->
+              <div class="flex flex-col gap-2 flex-shrink-0">
+                <button @click="deployForm.domain=d.name; activeTab='deploy'; loadPorts()"
+                  class="flex items-center gap-1.5 px-3 py-1.5 bg-panel-accent/10 border border-panel-accent/40 text-panel-accent hover:bg-panel-accent/20 rounded-lg text-xs transition-colors whitespace-nowrap">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M12 5v14M5 12l7-7 7 7"/>
+                  </svg>
+                  Déployer ici
+                </button>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <div x-show="!domainsLoading && nginxDomains.length === 0"
+          class="text-center py-12 text-panel-muted text-sm">
+          Aucun domaine Nginx trouvé dans /etc/nginx/sites-available
+        </div>
+      </div>
     </div>
 
     <!-- ══════════════════════════════════════════
@@ -992,7 +1150,13 @@ function panelApp() {
     deployResult: null,
     showGeneratedFiles: false,
     servicePreview: '',
+    // Domaines
     nginxDomains: [],
+    domainsLoading: false,
+    nginxTesting: false,
+    nginxReloading: false,
+    nginxTestOutput: '',
+    nginxTestOk: false,
 
     // Import / Normaliser
     importedApps: [],
@@ -1033,6 +1197,7 @@ function panelApp() {
         dashboard: 'Dashboard Monitoring',
         services:  'Gestionnaire de Services',
         deploy:    'Déployer une Application',
+        domains:   'Gestionnaire de Domaines',
         import:    'Importer des Applications Existantes',
         tools:     'Outils — Git & Fichiers',
       };
@@ -1065,7 +1230,8 @@ function panelApp() {
     async init() {
       await this.fetchStats();
       await this.loadServices();
-      // Auto-scan au démarrage (import + repos git)
+      // Auto-scan au démarrage
+      this.loadDomains();
       this.scanApps();
       this.scanGitRepos();
       this.statsInterval = setInterval(() => this.fetchStats(), 4000);
@@ -1153,11 +1319,50 @@ function panelApp() {
     },
 
     async loadDomains() {
+      this.domainsLoading = true;
       try {
         const r = await fetch('/api/nginx/domains');
         const data = await r.json();
         this.nginxDomains = data.domains || [];
-      } catch (e) {}
+      } catch (e) {
+        this.showToast('Erreur chargement domaines', 'error');
+      } finally {
+        this.domainsLoading = false;
+      }
+    },
+
+    async nginxTest() {
+      this.nginxTesting = true;
+      this.nginxTestOutput = '';
+      try {
+        const r = await fetch('/api/nginx/test', { method: 'POST' });
+        const data = await r.json();
+        this.nginxTestOk = data.success;
+        this.nginxTestOutput = data.output || (data.success ? 'Configuration OK' : 'Erreur de configuration');
+        this.showToast(data.success ? 'nginx -t OK ✓' : 'nginx -t : erreur de config', data.success ? 'success' : 'error');
+      } catch (e) {
+        this.showToast('Erreur réseau', 'error');
+      } finally {
+        this.nginxTesting = false;
+      }
+    },
+
+    async nginxReload() {
+      this.nginxReloading = true;
+      try {
+        const r = await fetch('/api/nginx/reload', { method: 'POST' });
+        const data = await r.json();
+        if (data.success) {
+          this.showToast('Nginx rechargé ✓' + (data.demo ? ' [DÉMO]' : ''), 'success');
+          this.loadDomains();
+        } else {
+          this.showToast(`Erreur reload: ${data.message}`, 'error');
+        }
+      } catch (e) {
+        this.showToast('Erreur réseau', 'error');
+      } finally {
+        this.nginxReloading = false;
+      }
     },
 
     previewServiceFile() {
@@ -1396,6 +1601,7 @@ WantedBy=multi-user.target`;
       this.refreshing = true;
       await this.fetchStats();
       if (this.activeTab === 'services') await this.loadServices();
+      if (this.activeTab === 'domains') await this.loadDomains();
       if (this.activeTab === 'import') await this.scanApps();
       if (this.activeTab === 'tools') await this.scanGitRepos();
       setTimeout(() => { this.refreshing = false; }, 600);

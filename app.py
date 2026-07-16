@@ -597,21 +597,97 @@ def deploy():
 
 
 # ─────────────────────────────────────────────────────────
-#  API — INFOS NGINX EXISTANTES
+#  API — GESTION DOMAINES NGINX
 # ─────────────────────────────────────────────────────────
+
+DEMO_DOMAINS = [
+    {
+        "name": "andriah.run.place",
+        "conf_path": "/etc/nginx/sites-available/andriah.run.place",
+        "enabled": True,
+        "apps": ["money-manager", "gps-fleet-manager"],
+        "ssl": True,
+    },
+    {
+        "name": "support.i-tracker.online",
+        "conf_path": "/etc/nginx/sites-available/support.i-tracker.online",
+        "enabled": True,
+        "apps": ["i-tracker-backend"],
+        "ssl": True,
+    },
+    {
+        "name": "i-tracker.online",
+        "conf_path": "/etc/nginx/sites-available/i-tracker.online",
+        "enabled": True,
+        "apps": ["odometer"],
+        "ssl": True,
+    },
+]
+
+
+def get_domain_details(conf_file: Path) -> dict:
+    """Parse a nginx conf file and extract useful info."""
+    name = conf_file.name
+    try:
+        content = conf_file.read_text()
+    except Exception:
+        content = ""
+
+    ssl = "ssl_certificate" in content or "listen 443" in content
+
+    # Detect apps from include patterns: /etc/nginx/<domain>-apps/*.conf
+    include_dir = Path(f"/etc/nginx/{name}-apps")
+    apps = []
+    if include_dir.exists():
+        apps = [f.stem for f in include_dir.glob("*.conf")]
+
+    # Check if enabled (symlink in sites-enabled)
+    sites_enabled = Path("/etc/nginx/sites-enabled")
+    enabled = (sites_enabled / name).exists() if sites_enabled.exists() else True
+
+    return {
+        "name": name,
+        "conf_path": str(conf_file),
+        "enabled": enabled,
+        "apps": apps,
+        "ssl": ssl,
+    }
+
 
 @app.route("/api/nginx/domains")
 @login_required
 def nginx_domains():
     if not IS_VPS:
-        return jsonify({
-            "domains": ["andriah.run.place", "support.i-tracker.online", "i-tracker.online"],
-            "demo": True,
-        })
+        return jsonify({"domains": DEMO_DOMAINS, "demo": True})
+
     domains = []
     if NGINX_SITES_AVAILABLE.exists():
-        domains = [f.name for f in NGINX_SITES_AVAILABLE.iterdir() if f.is_file()]
+        for f in sorted(NGINX_SITES_AVAILABLE.iterdir()):
+            if f.is_file():
+                domains.append(get_domain_details(f))
+
     return jsonify({"domains": domains, "demo": False})
+
+
+@app.route("/api/nginx/test", methods=["POST"])
+@login_required
+def nginx_test():
+    if not IS_VPS:
+        return jsonify({"success": True, "output": "[DÉMO] nginx: the configuration file /etc/nginx/nginx.conf syntax is ok\nnginx: configuration file /etc/nginx/nginx.conf test is successful", "demo": True})
+    rc, out, err = run_cmd(["nginx", "-t"])
+    return jsonify({"success": rc == 0, "output": (out or "") + (err or ""), "demo": False})
+
+
+@app.route("/api/nginx/reload", methods=["POST"])
+@login_required
+def nginx_reload():
+    if not IS_VPS:
+        return jsonify({"success": True, "message": "[DÉMO] nginx rechargé avec succès", "demo": True})
+    rc_test, _, err_test = run_cmd(["nginx", "-t"])
+    if rc_test != 0:
+        return jsonify({"success": False, "message": f"Config invalide : {err_test}"})
+    rc, out, err = run_cmd(["systemctl", "reload", "nginx"])
+    return jsonify({"success": rc == 0, "message": out or err or "nginx rechargé", "demo": False})
 
 
 # ─────────────────────────────────────────────────────────
