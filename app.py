@@ -10,13 +10,57 @@ import shutil
 import socket
 import subprocess
 from datetime import datetime, timezone
+from functools import wraps
 from pathlib import Path
 
 import psutil
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("PANEL_SECRET_KEY", secrets.token_hex(32))
+app.secret_key = os.environ.get("SESSION_SECRET", secrets.token_hex(32))
+
+PANEL_USERNAME = os.environ.get("PANEL_USERNAME", "admin")
+PANEL_PASSWORD = os.environ.get("PANEL_PASSWORD", "admin")
+
+
+# ─────────────────────────────────────────────────────────
+#  AUTH
+# ─────────────────────────────────────────────────────────
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            if request.is_json or request.path.startswith("/api/"):
+                return jsonify({"success": False, "error": "Non authentifié"}), 401
+            return redirect(url_for("login_page"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.route("/login", methods=["GET"])
+def login_page():
+    if session.get("logged_in"):
+        return redirect(url_for("index"))
+    error = request.args.get("error")
+    return render_template("login.html", error=error)
+
+
+@app.route("/login", methods=["POST"])
+def login_submit():
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "")
+    if username == PANEL_USERNAME and password == PANEL_PASSWORD:
+        session["logged_in"] = True
+        session["username"] = username
+        return redirect(url_for("index"))
+    return redirect(url_for("login_page", error="Identifiants incorrects"))
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login_page"))
 
 # Détection de l'environnement VPS réel
 IS_VPS = Path("/etc/systemd/system").exists()
@@ -103,6 +147,7 @@ DEMO_SERVICES = [
 # ─────────────────────────────────────────────────────────
 
 @app.route("/")
+@login_required
 def index():
     demo_mode = not IS_VPS
     return render_template("index.html", demo_mode=demo_mode)
@@ -113,6 +158,7 @@ def index():
 # ─────────────────────────────────────────────────────────
 
 @app.route("/api/system-stats")
+@login_required
 def system_stats():
     cpu_percent = psutil.cpu_percent(interval=0.3)
     cpu_count = psutil.cpu_count(logical=True)
@@ -192,6 +238,7 @@ def system_stats():
 # ─────────────────────────────────────────────────────────
 
 @app.route("/api/services")
+@login_required
 def list_services():
     if not IS_VPS:
         return jsonify({"services": DEMO_SERVICES, "demo": True})
@@ -226,6 +273,7 @@ def list_services():
 
 
 @app.route("/api/services/<name>/<action>", methods=["POST"])
+@login_required
 def service_action(name: str, action: str):
     if action not in ("start", "stop", "restart", "enable", "disable"):
         return jsonify({"success": False, "error": "Action non autorisée"}), 400
@@ -250,6 +298,7 @@ def service_action(name: str, action: str):
 
 
 @app.route("/api/services/<name>/logs")
+@login_required
 def service_logs(name: str):
     if not re.match(r"^[a-zA-Z0-9_\-]+$", name):
         return jsonify({"success": False, "error": "Nom de service invalide"}), 400
@@ -285,6 +334,7 @@ def service_logs(name: str):
 
 
 @app.route("/api/services/<name>/status")
+@login_required
 def service_status(name: str):
     if not re.match(r"^[a-zA-Z0-9_\-]+$", name):
         return jsonify({"success": False, "error": "Nom de service invalide"}), 400
@@ -311,6 +361,7 @@ def service_status(name: str):
 # ─────────────────────────────────────────────────────────
 
 @app.route("/api/ports/scan")
+@login_required
 def scan_ports():
     free_port = find_free_port()
     used_ports = sorted(
@@ -394,6 +445,7 @@ location /{app_name}/ {{
 
 
 @app.route("/api/deploy", methods=["POST"])
+@login_required
 def deploy():
     data = request.get_json(force=True)
 
@@ -549,6 +601,7 @@ def deploy():
 # ─────────────────────────────────────────────────────────
 
 @app.route("/api/nginx/domains")
+@login_required
 def nginx_domains():
     if not IS_VPS:
         return jsonify({

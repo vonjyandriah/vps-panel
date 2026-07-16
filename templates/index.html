@@ -141,12 +141,19 @@
     </nav>
 
     <!-- Footer -->
-    <div class="px-4 py-4 border-t border-panel-border">
+    <div class="px-4 py-4 border-t border-panel-border space-y-3">
       <div class="flex items-center gap-2">
         <span class="pulse-dot" :class="demoMode ? 'bg-panel-yellow' : 'bg-panel-green'"></span>
         <span class="text-xs text-panel-muted" x-text="demoMode ? 'Mode Démo' : 'VPS Connecté'"></span>
       </div>
-      <div class="text-xs text-panel-muted mt-1 font-mono" x-text="stats.uptime ? 'Uptime: '+stats.uptime : ''"></div>
+      <div class="text-xs text-panel-muted font-mono" x-text="stats.uptime ? 'Uptime: '+stats.uptime : ''"></div>
+      <a href="/logout"
+        class="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-xs text-panel-muted hover:text-panel-red hover:bg-red-900/10 border border-transparent hover:border-red-900/30 transition-colors">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+        </svg>
+        Déconnexion
+      </a>
     </div>
   </aside>
 
@@ -374,26 +381,29 @@
                   <div class="flex items-center justify-end gap-1.5">
                     <!-- Logs -->
                     <button @click="openLogs(svc.name)"
-                      class="px-2 py-1 rounded text-xs bg-panel-bg text-panel-muted hover:text-panel-accent border border-panel-border transition-colors font-mono">
-                      logs
+                      class="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs bg-panel-bg text-panel-muted hover:text-panel-accent border border-panel-border transition-colors font-mono">
+                      <span>📋</span><span>Logs</span>
                     </button>
                     <!-- Start -->
                     <button @click="serviceAction(svc.name, 'start')"
                       :disabled="svc.status==='active' || actionPending===svc.name"
-                      class="px-2 py-1 rounded text-xs bg-panel-bg text-panel-green hover:bg-green-900/30 border border-panel-border transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-                      ▶
+                      title="Démarrer"
+                      class="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs bg-panel-bg text-panel-green hover:bg-green-900/30 border border-panel-border transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                      <span>▶</span><span>Start</span>
                     </button>
                     <!-- Restart -->
                     <button @click="serviceAction(svc.name, 'restart')"
                       :disabled="actionPending===svc.name"
-                      class="px-2 py-1 rounded text-xs bg-panel-bg text-panel-yellow hover:bg-yellow-900/30 border border-panel-border transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-                      ↺
+                      title="Redémarrer"
+                      class="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs bg-panel-bg text-panel-yellow hover:bg-yellow-900/30 border border-panel-border transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                      <span>↺</span><span>Restart</span>
                     </button>
                     <!-- Stop -->
                     <button @click="serviceAction(svc.name, 'stop')"
                       :disabled="svc.status!=='active' || actionPending===svc.name"
-                      class="px-2 py-1 rounded text-xs bg-panel-bg text-panel-red hover:bg-red-900/30 border border-panel-border transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-                      ■
+                      title="Arrêter"
+                      class="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs bg-panel-bg text-panel-red hover:bg-red-900/30 border border-panel-border transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                      <span>■</span><span>Stop</span>
                     </button>
                   </div>
                 </td>
@@ -437,7 +447,7 @@
     <!-- ══════════════════════════════════════════
          TAB : DÉPLOIEMENT
     ══════════════════════════════════════════ -->
-    <div x-show="activeTab==='deploy'" x-cloak class="p-6 max-w-3xl fade-in">
+    <div x-show="activeTab==='deploy'" x-cloak class="p-6 fade-in">
 
       <div class="bg-panel-surface border border-panel-border rounded-xl p-6">
         <h2 class="text-base font-semibold text-white mb-1">Déployer une nouvelle application</h2>

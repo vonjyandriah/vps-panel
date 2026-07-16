@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VPS Admin — Connexion</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            panel: {
+              bg:      '#0d1117',
+              surface: '#161b22',
+              border:  '#30363d',
+              text:    '#c9d1d9',
+              muted:   '#8b949e',
+              accent:  '#58a6ff',
+              green:   '#3fb950',
+              red:     '#f85149',
+            }
+          },
+          fontFamily: { mono: ['JetBrains Mono', 'Fira Code', 'monospace'] }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background: #0d1117; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    input:-webkit-autofill {
+      -webkit-box-shadow: 0 0 0 30px #161b22 inset !important;
+      -webkit-text-fill-color: #c9d1d9 !important;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center bg-panel-bg text-panel-text">
+
+  <div class="w-full max-w-sm">
+
+    <!-- Logo -->
+    <div class="flex flex-col items-center mb-8">
+      <div class="w-14 h-14 rounded-2xl bg-panel-accent flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-blue-500/20 mb-4">V</div>
+      <h1 class="text-xl font-semibold text-white">VPS Admin Panel</h1>
+      <p class="text-sm text-panel-muted mt-1 font-mono">Mini-PaaS · Connexion requise</p>
+    </div>
+
+    <!-- Card -->
+    <div class="bg-panel-surface border border-panel-border rounded-2xl p-7 shadow-2xl">
+
+      {% if error %}
+      <div class="mb-5 flex items-center gap-2.5 bg-red-900/20 border border-panel-red/40 rounded-lg px-4 py-3">
+        <span class="text-panel-red text-base">✗</span>
+        <p class="text-sm text-panel-red">{{ error }}</p>
+      </div>
+      {% endif %}
+
+      <form method="POST" action="/login" class="space-y-4">
+        <div>
+          <label class="block text-xs text-panel-muted uppercase tracking-wider mb-1.5">Identifiant</label>
+          <input
+            type="text"
+            name="username"
+            autocomplete="username"
+            autofocus
+            placeholder="admin"
+            class="w-full bg-panel-bg border border-panel-border rounded-lg px-3 py-2.5 text-sm text-panel-text placeholder-panel-muted focus:outline-none focus:border-panel-accent transition-colors"/>
+        </div>
+
+        <div>
+          <label class="block text-xs text-panel-muted uppercase tracking-wider mb-1.5">Mot de passe</label>
+          <input
+            type="password"
+            name="password"
+            autocomplete="current-password"
+            placeholder="••••••••"
+            class="w-full bg-panel-bg border border-panel-border rounded-lg px-3 py-2.5 text-sm text-panel-text placeholder-panel-muted focus:outline-none focus:border-panel-accent transition-colors"/>
+        </div>
+
+        <button
+          type="submit"
+          class="w-full mt-2 py-2.5 bg-panel-accent hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors">
+          Se connecter
+        </button>
+      </form>
+    </div>
+
+    <!-- Hint -->
+    <p class="text-center text-xs text-panel-muted mt-5">
+      Configurez via les variables d'env
+      <code class="font-mono bg-panel-surface px-1 py-0.5 rounded text-panel-accent">PANEL_USERNAME</code> /
+      <code class="font-mono bg-panel-surface px-1 py-0.5 rounded text-panel-accent">PANEL_PASSWORD</code>
+    </p>
+
+  </div>
+
+</body>
+</html>
