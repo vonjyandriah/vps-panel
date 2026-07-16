@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VPS Admin Panel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            panel: {
+              bg:      '#0d1117',
+              surface: '#161b22',
+              border:  '#30363d',
+              text:    '#c9d1d9',
+              muted:   '#8b949e',
+              accent:  '#58a6ff',
+              green:   '#3fb950',
+              yellow:  '#d29922',
+              red:     '#f85149',
+              purple:  '#bc8cff',
+            }
+          },
+          fontFamily: { mono: ['JetBrains Mono', 'Fira Code', 'monospace'] }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; background: #0d1117; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #161b22; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #58a6ff; }
+
+    /* Gauge ring */
+    .gauge-ring { transform: rotate(-90deg); }
+    .gauge-ring circle { fill: none; stroke-linecap: round; transition: stroke-dashoffset 0.8s ease; }
+
+    /* Status badges */
+    .badge-active  { background: #1a2f1a; color: #3fb950; border: 1px solid #238636; }
+    .badge-inactive{ background: #1f1f1f; color: #8b949e; border: 1px solid #30363d; }
+    .badge-failed  { background: #2f1a1a; color: #f85149; border: 1px solid #6e2e2e; }
+
+    /* Log console */
+    .log-console {
+      background: #010409;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      line-height: 1.6;
+      border: 1px solid #30363d;
+    }
+
+    /* Pulse dot */
+    .pulse-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* Card hover */
+    .card { transition: border-color 0.2s, box-shadow 0.2s; }
+    .card:hover { border-color: #58a6ff40; box-shadow: 0 0 0 1px #58a6ff20; }
+
+    /* Sidebar nav item */
+    .nav-item { transition: background 0.15s, color 0.15s; }
+    .nav-item.active { background: #1f2d3d; color: #58a6ff; }
+    .nav-item:hover:not(.active) { background: #1c2128; }
+
+    /* Progress bar */
+    .progress-bar { transition: width 0.8s ease; }
+
+    /* Step ok/fail */
+    .step-ok   { color: #3fb950; }
+    .step-fail { color: #f85149; }
+    .step-pending { color: #8b949e; }
+
+    /* Fade in */
+    [x-cloak] { display: none !important; }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+
+<body class="text-panel-text min-h-screen" x-data="panelApp()" x-init="init()">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="fixed left-0 top-0 h-full w-56 bg-panel-surface border-r border-panel-border flex flex-col z-30">
+    <!-- Logo -->
+    <div class="px-4 py-5 border-b border-panel-border">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-panel-accent flex items-center justify-center text-white font-bold text-sm">V</div>
+        <div>
+          <div class="text-sm font-semibold text-white">VPS Admin</div>
+          <div class="text-xs text-panel-muted font-mono">Mini-PaaS</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 px-3 py-4 space-y-1">
+      <button @click="activeTab='dashboard'" :class="{'active': activeTab==='dashboard'}"
+        class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-panel-muted cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        Dashboard
+      </button>
+
+      <button @click="activeTab='services'; loadServices()" :class="{'active': activeTab==='services'}"
+        class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-panel-muted cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M5 12h14M5 6h14M5 18h14"/>
+        </svg>
+        Services
+        <span x-show="serviceStats.failed > 0" class="ml-auto bg-panel-red text-white text-xs px-1.5 py-0.5 rounded-full" x-text="serviceStats.failed"></span>
+      </button>
+
+      <button @click="activeTab='deploy'; loadPorts()" :class="{'active': activeTab==='deploy'}"
+        class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-panel-muted cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M12 5v14M5 12l7-7 7 7"/>
+        </svg>
+        Déployer
+      </button>
+    </nav>
+
+    <!-- Footer -->
+    <div class="px-4 py-4 border-t border-panel-border">
+      <div class="flex items-center gap-2">
+        <span class="pulse-dot" :class="demoMode ? 'bg-panel-yellow' : 'bg-panel-green'"></span>
+        <span class="text-xs text-panel-muted" x-text="demoMode ? 'Mode Démo' : 'VPS Connecté'"></span>
+      </div>
+      <div class="text-xs text-panel-muted mt-1 font-mono" x-text="stats.uptime ? 'Uptime: '+stats.uptime : ''"></div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN CONTENT ── -->
+  <main class="ml-56 min-h-screen">
+
+    <!-- Header -->
+    <header class="sticky top-0 z-20 bg-panel-bg border-b border-panel-border px-6 py-3 flex items-center justify-between">
+      <div>
+        <h1 class="text-base font-semibold text-white capitalize" x-text="tabTitle"></h1>
+        <p class="text-xs text-panel-muted">{{ 'Mode Démo – exécutez sur votre VPS pour accès complet' if demo_mode else 'Connecté à votre VPS' }}</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-panel-muted font-mono" x-text="lastRefresh"></span>
+        <button @click="refreshAll()" class="p-1.5 rounded-lg hover:bg-panel-border transition-colors text-panel-muted hover:text-white">
+          <svg class="w-4 h-4" :class="{'animate-spin': refreshing}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ══════════════════════════════════════════
+         TAB : DASHBOARD
+    ══════════════════════════════════════════ -->
+    <div x-show="activeTab==='dashboard'" x-cloak class="p-6 space-y-6 fade-in">
+
+      <!-- Metrics row -->
+      <div class="grid grid-cols-3 gap-4">
+
+        <!-- CPU -->
+        <div class="card bg-panel-surface border border-panel-border rounded-xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <p class="text-xs text-panel-muted uppercase tracking-wider">Processeur</p>
+              <p class="text-2xl font-bold text-white mt-0.5" x-text="stats.cpu?.percent?.toFixed(1) + '%'">—</p>
+              <p class="text-xs text-panel-muted mt-1" x-text="(stats.cpu?.cores || '—') + ' cœurs · ' + (stats.cpu?.freq_mhz || '—') + ' MHz'"></p>
+            </div>
+            <div class="relative w-16 h-16">
+              <svg class="gauge-ring w-16 h-16">
+                <circle cx="32" cy="32" r="26" stroke="#30363d" stroke-width="5"/>
+                <circle cx="32" cy="32" r="26" stroke="#58a6ff" stroke-width="5"
+                  :stroke-dasharray="163.4"
+                  :stroke-dashoffset="163.4 - (163.4 * (stats.cpu?.percent || 0) / 100)"/>
+              </svg>
+            </div>
+          </div>
+          <div class="h-1.5 bg-panel-border rounded-full overflow-hidden">
+            <div class="progress-bar h-full rounded-full"
+              :style="'width:' + (stats.cpu?.percent || 0) + '%'"
+              :class="cpuColor"></div>
+          </div>
+          <!-- Top processes -->
+          <div class="mt-4 space-y-1" x-show="stats.top_procs?.length">
+            <p class="text-xs text-panel-muted mb-2">Top processus</p>
+            <template x-for="p in (stats.top_procs || [])" :key="p.pid">
+              <div class="flex justify-between text-xs">
+                <span class="text-panel-muted truncate max-w-[120px]" x-text="p.name"></span>
+                <span class="font-mono" :class="p.cpu > 50 ? 'text-panel-red' : 'text-panel-accent'" x-text="p.cpu + '%'"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- RAM -->
+        <div class="card bg-panel-surface border border-panel-border rounded-xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <p class="text-xs text-panel-muted uppercase tracking-wider">Mémoire RAM</p>
+              <p class="text-2xl font-bold text-white mt-0.5" x-text="stats.ram?.percent?.toFixed(1) + '%'">—</p>
+              <p class="text-xs text-panel-muted mt-1"
+                x-text="(stats.ram?.used_human || '—') + ' / ' + (stats.ram?.total_human || '—')"></p>
+            </div>
+            <div class="relative w-16 h-16">
+              <svg class="gauge-ring w-16 h-16">
+                <circle cx="32" cy="32" r="26" stroke="#30363d" stroke-width="5"/>
+                <circle cx="32" cy="32" r="26" stroke="#3fb950" stroke-width="5"
+                  :stroke-dasharray="163.4"
+                  :stroke-dashoffset="163.4 - (163.4 * (stats.ram?.percent || 0) / 100)"/>
+              </svg>
+            </div>
+          </div>
+          <div class="h-1.5 bg-panel-border rounded-full overflow-hidden">
+            <div class="progress-bar h-full rounded-full"
+              :style="'width:' + (stats.ram?.percent || 0) + '%'"
+              :class="ramColor"></div>
+          </div>
+          <div class="mt-4 grid grid-cols-2 gap-2">
+            <div class="bg-panel-bg rounded-lg p-2 text-center">
+              <p class="text-xs text-panel-muted">Disponible</p>
+              <p class="text-sm font-mono text-panel-green mt-0.5" x-text="stats.ram?.available_human || '—'"></p>
+            </div>
+            <div class="bg-panel-bg rounded-lg p-2 text-center">
+              <p class="text-xs text-panel-muted">Utilisée</p>
+              <p class="text-sm font-mono text-panel-accent mt-0.5" x-text="stats.ram?.used_human || '—'"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Disque -->
+        <div class="card bg-panel-surface border border-panel-border rounded-xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <p class="text-xs text-panel-muted uppercase tracking-wider">Disque (/)</p>
+              <p class="text-2xl font-bold text-white mt-0.5" x-text="stats.disk?.percent?.toFixed(1) + '%'">—</p>
+              <p class="text-xs text-panel-muted mt-1"
+                x-text="(stats.disk?.used_human || '—') + ' / ' + (stats.disk?.total_human || '—')"></p>
+            </div>
+            <div class="relative w-16 h-16">
+              <svg class="gauge-ring w-16 h-16">
+                <circle cx="32" cy="32" r="26" stroke="#30363d" stroke-width="5"/>
+                <circle cx="32" cy="32" r="26" stroke="#bc8cff" stroke-width="5"
+                  :stroke-dasharray="163.4"
+                  :stroke-dashoffset="163.4 - (163.4 * (stats.disk?.percent || 0) / 100)"/>
+              </svg>
+            </div>
+          </div>
+          <div class="h-1.5 bg-panel-border rounded-full overflow-hidden">
+            <div class="progress-bar h-full rounded-full bg-panel-purple"
+              :style="'width:' + (stats.disk?.percent || 0) + '%'"></div>
+          </div>
+          <div class="mt-4 grid grid-cols-2 gap-2">
+            <div class="bg-panel-bg rounded-lg p-2 text-center">
+              <p class="text-xs text-panel-muted">Libre</p>
+              <p class="text-sm font-mono text-panel-purple mt-0.5" x-text="stats.disk?.free_human || '—'"></p>
+            </div>
+            <div class="bg-panel-bg rounded-lg p-2 text-center">
+              <p class="text-xs text-panel-muted">Total</p>
+              <p class="text-sm font-mono text-panel-muted mt-0.5" x-text="stats.disk?.total_human || '—'"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Network + Services overview -->
+      <div class="grid grid-cols-2 gap-4">
+
+        <!-- Réseau -->
+        <div class="card bg-panel-surface border border-panel-border rounded-xl p-5">
+          <p class="text-xs text-panel-muted uppercase tracking-wider mb-4">Réseau</p>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-xs text-panel-muted mb-1">↑ Envoyé</p>
+              <p class="text-lg font-mono text-panel-accent" x-text="stats.network?.sent_human || '—'"></p>
+            </div>
+            <div>
+              <p class="text-xs text-panel-muted mb-1">↓ Reçu</p>
+              <p class="text-lg font-mono text-panel-green" x-text="stats.network?.recv_human || '—'"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Services summary -->
+        <div class="card bg-panel-surface border border-panel-border rounded-xl p-5">
+          <p class="text-xs text-panel-muted uppercase tracking-wider mb-4">Aperçu Services</p>
+          <div class="grid grid-cols-3 gap-4">
+            <div class="text-center">
+              <p class="text-2xl font-bold text-panel-green" x-text="serviceStats.active"></p>
+              <p class="text-xs text-panel-muted mt-0.5">Actifs</p>
+            </div>
+            <div class="text-center">
+              <p class="text-2xl font-bold text-panel-muted" x-text="serviceStats.inactive"></p>
+              <p class="text-xs text-panel-muted mt-0.5">Inactifs</p>
+            </div>
+            <div class="text-center">
+              <p class="text-2xl font-bold text-panel-red" x-text="serviceStats.failed"></p>
+              <p class="text-xs text-panel-muted mt-0.5">Échoués</p>
+            </div>
+          </div>
+          <button @click="activeTab='services'; loadServices()"
+            class="mt-4 w-full text-xs text-panel-accent hover:text-white transition-colors">
+            Voir tous les services →
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         TAB : SERVICES
+    ══════════════════════════════════════════ -->
+    <div x-show="activeTab==='services'" x-cloak class="p-6 fade-in">
+
+      <!-- Filtres -->
+      <div class="flex items-center gap-3 mb-4">
+        <input x-model="serviceFilter" placeholder="Filtrer par nom..."
+          class="bg-panel-surface border border-panel-border rounded-lg px-3 py-2 text-sm text-panel-text placeholder-panel-muted focus:outline-none focus:border-panel-accent w-56"/>
+        <div class="flex gap-1.5 ml-2">
+          <template x-for="f in ['tous','active','inactive','failed']" :key="f">
+            <button @click="serviceStatusFilter=f"
+              :class="serviceStatusFilter===f ? 'bg-panel-accent text-white' : 'bg-panel-surface text-panel-muted hover:text-white'"
+              class="px-3 py-1.5 rounded-lg text-xs border border-panel-border transition-colors capitalize" x-text="f"></button>
+          </template>
+        </div>
+        <div class="ml-auto">
+          <button @click="loadServices()" class="text-xs text-panel-accent hover:text-white transition-colors">↺ Actualiser</button>
+        </div>
+      </div>
+
+      <!-- Services list -->
+      <div class="bg-panel-surface border border-panel-border rounded-xl overflow-hidden">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-panel-border">
+              <th class="text-left px-4 py-3 text-xs text-panel-muted uppercase tracking-wider">Service</th>
+              <th class="text-left px-4 py-3 text-xs text-panel-muted uppercase tracking-wider w-28">État</th>
+              <th class="text-right px-4 py-3 text-xs text-panel-muted uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-panel-border">
+            <template x-for="svc in filteredServices" :key="svc.name">
+              <tr class="hover:bg-panel-bg transition-colors">
+                <td class="px-4 py-3">
+                  <div class="font-mono text-xs text-panel-accent" x-text="svc.name"></div>
+                  <div class="text-xs text-panel-muted mt-0.5 truncate max-w-sm" x-text="svc.description || '—'"></div>
+                </td>
+                <td class="px-4 py-3">
+                  <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
+                    :class="svc.status==='active' ? 'badge-active' : svc.status==='failed' ? 'badge-failed' : 'badge-inactive'">
+                    <span class="w-1.5 h-1.5 rounded-full inline-block"
+                      :class="svc.status==='active' ? 'bg-panel-green' : svc.status==='failed' ? 'bg-panel-red' : 'bg-panel-muted'"></span>
+                    <span x-text="svc.status"></span>
+                  </span>
+                </td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center justify-end gap-1.5">
+                    <!-- Logs -->
+                    <button @click="openLogs(svc.name)"
+                      class="px-2 py-1 rounded text-xs bg-panel-bg text-panel-muted hover:text-panel-accent border border-panel-border transition-colors font-mono">
+                      logs
+                    </button>
+                    <!-- Start -->
+                    <button @click="serviceAction(svc.name, 'start')"
+                      :disabled="svc.status==='active' || actionPending===svc.name"
+                      class="px-2 py-1 rounded text-xs bg-panel-bg text-panel-green hover:bg-green-900/30 border border-panel-border transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                      ▶
+                    </button>
+                    <!-- Restart -->
+                    <button @click="serviceAction(svc.name, 'restart')"
+                      :disabled="actionPending===svc.name"
+                      class="px-2 py-1 rounded text-xs bg-panel-bg text-panel-yellow hover:bg-yellow-900/30 border border-panel-border transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                      ↺
+                    </button>
+                    <!-- Stop -->
+                    <button @click="serviceAction(svc.name, 'stop')"
+                      :disabled="svc.status!=='active' || actionPending===svc.name"
+                      class="px-2 py-1 rounded text-xs bg-panel-bg text-panel-red hover:bg-red-900/30 border border-panel-border transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                      ■
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+            <tr x-show="servicesLoading">
+              <td colspan="3" class="px-4 py-8 text-center text-panel-muted text-sm">Chargement…</td>
+            </tr>
+            <tr x-show="!servicesLoading && filteredServices.length === 0">
+              <td colspan="3" class="px-4 py-8 text-center text-panel-muted text-sm">Aucun service trouvé</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Console de logs -->
+      <div x-show="logsPanel.visible" x-cloak class="mt-4 fade-in">
+        <div class="bg-panel-surface border border-panel-border rounded-xl overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-2.5 border-b border-panel-border">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-panel-green pulse-dot"></span>
+              <span class="text-xs font-mono text-panel-accent" x-text="'journalctl -u ' + logsPanel.service + '.service -n 100'"></span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button @click="loadLogs(logsPanel.service)" class="text-xs text-panel-muted hover:text-white">↺</button>
+              <button @click="logsPanel.visible=false" class="text-xs text-panel-muted hover:text-panel-red ml-2">✕ Fermer</button>
+            </div>
+          </div>
+          <div class="log-console p-4 h-72 overflow-y-auto" x-ref="logConsole">
+            <template x-if="logsPanel.loading">
+              <p class="text-panel-muted">Chargement des logs…</p>
+            </template>
+            <template x-if="!logsPanel.loading">
+              <pre class="whitespace-pre-wrap text-panel-green" x-text="logsPanel.content"></pre>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         TAB : DÉPLOIEMENT
+    ══════════════════════════════════════════ -->
+    <div x-show="activeTab==='deploy'" x-cloak class="p-6 max-w-3xl fade-in">
+
+      <div class="bg-panel-surface border border-panel-border rounded-xl p-6">
+        <h2 class="text-base font-semibold text-white mb-1">Déployer une nouvelle application</h2>
+        <p class="text-xs text-panel-muted mb-6">Génère automatiquement le service Systemd et la configuration Nginx, puis active le projet.</p>
+
+        <form @submit.prevent="deploy()" class="space-y-5">
+
+          <!-- Ligne 1 : Parent + App name -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs text-panel-muted mb-1.5 uppercase tracking-wider">Chemin parent</label>
+              <input x-model="deployForm.parent_path" placeholder="/opt/monprojet"
+                class="w-full bg-panel-bg border border-panel-border rounded-lg px-3 py-2.5 text-sm font-mono text-panel-text placeholder-panel-muted focus:outline-none focus:border-panel-accent transition-colors"/>
+              <p class="text-xs text-panel-muted mt-1">Ex: /opt/andriah, /opt/i-tracker</p>
+            </div>
+            <div>
+              <label class="block text-xs text-panel-muted mb-1.5 uppercase tracking-wider">Nom / Slug de l'app</label>
+              <input x-model="deployForm.app_name" placeholder="mon-app"
+                class="w-full bg-panel-bg border border-panel-border rounded-lg px-3 py-2.5 text-sm font-mono text-panel-text placeholder-panel-muted focus:outline-none focus:border-panel-accent transition-colors"/>
+              <p class="text-xs text-panel-muted mt-1">Alphanumérique + tirets</p>
+            </div>
+          </div>
+
+          <!-- Chemin complet (aperçu) -->
+          <div class="bg-panel-bg border border-panel-border rounded-lg px-3 py-2.5">
+            <p class="text-xs text-panel-muted mb-0.5">Chemin projet</p>
+            <p class="font-mono text-xs text-panel-accent"
+              x-text="(deployForm.parent_path || '/opt/..') + '/' + (deployForm.app_name || 'mon-app')"></p>
+          </div>
+
+          <!-- Domaine -->
+          <div>
+            <label class="block text-xs text-panel-muted mb-1.5 uppercase tracking-wider">Domaine / Sous-domaine</label>
+            <div class="flex gap-2">
+              <input x-model="deployForm.domain" placeholder="support.i-tracker.online"
+                class="flex-1 bg-panel-bg border border-panel-border rounded-lg px-3 py-2.5 text-sm font-mono text-panel-text placeholder-panel-muted focus:outline-none focus:border-panel-accent transition-colors"/>
+              <button type="button" @click="loadDomains()"
+                class="px-3 py-2.5 bg-panel-bg border border-panel-border rounded-lg text-xs text-panel-muted hover:text-panel-accent transition-colors whitespace-nowrap">
+                Domaines Nginx
+              </button>
+            </div>
+            <!-- Suggestions de domaines -->
+            <div x-show="nginxDomains.length" class="flex flex-wrap gap-1.5 mt-2">
+              <template x-for="d in nginxDomains" :key="d">
+                <button type="button" @click="deployForm.domain=d"
+                  :class="deployForm.domain===d ? 'bg-panel-accent/20 text-panel-accent border-panel-accent' : 'bg-panel-bg text-panel-muted border-panel-border'"
+                  class="px-2 py-1 rounded text-xs font-mono border hover:border-panel-accent transition-colors" x-text="d"></button>
+              </template>
+            </div>
+          </div>
+
+          <!-- Type de routage -->
+          <div>
+            <label class="block text-xs text-panel-muted mb-2 uppercase tracking-wider">Type de routage Nginx</label>
+            <div class="grid grid-cols-2 gap-3">
+              <label :class="deployForm.routing_type==='subfolder' ? 'border-panel-accent bg-panel-accent/10' : 'border-panel-border'"
+                class="flex items-start gap-3 p-3 rounded-lg border bg-panel-bg cursor-pointer transition-colors">
+                <input type="radio" value="subfolder" x-model="deployForm.routing_type" class="mt-0.5 accent-blue-500"/>
+                <div>
+                  <p class="text-sm font-medium text-panel-text">Sous-dossier</p>
+                  <p class="text-xs text-panel-muted mt-0.5 font-mono"
+                    x-text="(deployForm.domain || 'domaine.com') + '/' + (deployForm.app_name || 'app')"></p>
+                </div>
+              </label>
+              <label :class="deployForm.routing_type==='subdomain' ? 'border-panel-accent bg-panel-accent/10' : 'border-panel-border'"
+                class="flex items-start gap-3 p-3 rounded-lg border bg-panel-bg cursor-pointer transition-colors">
+                <input type="radio" value="subdomain" x-model="deployForm.routing_type" class="mt-0.5 accent-blue-500"/>
+                <div>
+                  <p class="text-sm font-medium text-panel-text">Sous-domaine dédié</p>
+                  <p class="text-xs text-panel-muted mt-0.5 font-mono" x-text="deployForm.domain || 'app.domaine.com'"></p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Port + Workers + wsgi -->
+          <div class="grid grid-cols-3 gap-4">
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="text-xs text-panel-muted uppercase tracking-wider">Port</label>
+                <button type="button" @click="loadPorts()" class="text-xs text-panel-accent hover:text-white transition-colors">
+                  Scanner
+                </button>
+              </div>
+              <input x-model="deployForm.port" type="number" min="1024" max="65535"
+                class="w-full bg-panel-bg border border-panel-border rounded-lg px-3 py-2.5 text-sm font-mono text-panel-text focus:outline-none focus:border-panel-accent transition-colors"/>
+              <p class="text-xs text-panel-muted mt-1">Premier port libre détecté</p>
+            </div>
+            <div>
+              <label class="block text-xs text-panel-muted mb-1.5 uppercase tracking-wider">Workers</label>
+              <input x-model="deployForm.workers" type="number" min="1" max="16"
+                class="w-full bg-panel-bg border border-panel-border rounded-lg px-3 py-2.5 text-sm font-mono text-panel-text focus:outline-none focus:border-panel-accent transition-colors"/>
+            </div>
+            <div>
+              <label class="block text-xs text-panel-muted mb-1.5 uppercase tracking-wider">Module WSGI</label>
+              <input x-model="deployForm.wsgi_module"
+                class="w-full bg-panel-bg border border-panel-border rounded-lg px-3 py-2.5 text-sm font-mono text-panel-text focus:outline-none focus:border-panel-accent transition-colors"/>
+            </div>
+          </div>
+
+          <!-- Submit -->
+          <div class="flex items-center gap-3 pt-2">
+            <button type="submit"
+              :disabled="deploying"
+              class="flex items-center gap-2 px-5 py-2.5 bg-panel-accent text-white rounded-lg text-sm font-medium hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              <svg x-show="deploying" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+              <span x-text="deploying ? 'Déploiement…' : '🚀 Déployer'"></span>
+            </button>
+            <button type="button" @click="previewServiceFile()"
+              class="px-4 py-2.5 bg-panel-bg border border-panel-border rounded-lg text-sm text-panel-muted hover:text-white transition-colors">
+              Aperçu .service
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Résultat du déploiement -->
+      <div x-show="deployResult" x-cloak class="mt-4 fade-in">
+        <div class="bg-panel-surface border rounded-xl overflow-hidden"
+          :class="deployResult?.success ? 'border-panel-green' : 'border-panel-red'">
+          <div class="px-4 py-3 border-b"
+            :class="deployResult?.success ? 'border-panel-green bg-green-900/10' : 'border-panel-red bg-red-900/10'">
+            <p class="text-sm font-medium"
+              :class="deployResult?.success ? 'text-panel-green' : 'text-panel-red'"
+              x-text="deployResult?.success ? '✓ Déploiement réussi' + (deployResult?.demo ? ' [DÉMO]' : '') : '✗ Échec du déploiement'"></p>
+          </div>
+
+          <!-- Steps -->
+          <div class="p-4 space-y-2">
+            <template x-for="step in deployResult?.steps || []" :key="step.step">
+              <div class="flex items-start gap-3 text-sm">
+                <span :class="step.ok ? 'text-panel-green' : 'text-panel-red'" class="text-base leading-4 mt-0.5">
+                  <span x-text="step.ok ? '✓' : '✗'"></span>
+                </span>
+                <div class="flex-1">
+                  <span class="font-mono text-xs" :class="step.ok ? 'text-panel-text' : 'text-panel-red'" x-text="step.step"></span>
+                  <p class="text-xs text-panel-muted mt-0.5" x-text="step.detail"></p>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <!-- Generated files preview -->
+          <div x-show="deployResult?.service_file" class="border-t border-panel-border">
+            <button @click="showGeneratedFiles=!showGeneratedFiles"
+              class="w-full px-4 py-2.5 text-left text-xs text-panel-muted hover:text-white flex items-center justify-between">
+              <span>Fichiers générés</span>
+              <span x-text="showGeneratedFiles ? '▲' : '▼'"></span>
+            </button>
+            <div x-show="showGeneratedFiles" x-cloak class="px-4 pb-4 space-y-3">
+              <div>
+                <p class="text-xs text-panel-muted mb-1.5 font-mono">/etc/systemd/system/<span x-text="deployForm.app_name"></span>.service</p>
+                <pre class="log-console p-3 rounded text-xs text-panel-green overflow-x-auto" x-text="deployResult?.service_file"></pre>
+              </div>
+              <div>
+                <p class="text-xs text-panel-muted mb-1.5 font-mono">Bloc Nginx généré</p>
+                <pre class="log-console p-3 rounded text-xs text-panel-accent overflow-x-auto" x-text="deployResult?.nginx_block"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Aperçu fichier .service (avant déploiement) -->
+      <div x-show="servicePreview" x-cloak class="mt-4 fade-in">
+        <div class="bg-panel-surface border border-panel-border rounded-xl overflow-hidden">
+          <div class="px-4 py-2.5 border-b border-panel-border flex justify-between items-center">
+            <p class="text-xs font-mono text-panel-muted">/etc/systemd/system/<span x-text="deployForm.app_name || 'mon-app'"></span>.service <span class="text-panel-yellow">[aperçu]</span></p>
+            <button @click="servicePreview=''" class="text-xs text-panel-muted hover:text-panel-red">✕</button>
+          </div>
+          <pre class="log-console p-4 text-xs text-panel-green overflow-x-auto" x-text="servicePreview"></pre>
+        </div>
+      </div>
+
+      <!-- Instructions sudoers -->
+      <div class="mt-6 bg-panel-surface border border-panel-border rounded-xl p-5">
+        <h3 class="text-sm font-semibold text-white mb-3">⚙️ Configuration sudoers recommandée</h3>
+        <p class="text-xs text-panel-muted mb-3">Pour que l'application panel puisse exécuter les commandes système sans mot de passe, ajoutez ces règles via <code class="font-mono bg-panel-bg px-1 py-0.5 rounded">visudo</code> :</p>
+        <pre class="log-console p-4 rounded text-xs text-panel-green overflow-x-auto">www-data ALL=(ALL) NOPASSWD: /bin/systemctl start *
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl stop *
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart *
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl enable *
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl disable *
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl daemon-reload
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx
+www-data ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t
+www-data ALL=(ALL) NOPASSWD: /bin/mkdir -p /etc/nginx/*
+www-data ALL=(ALL) NOPASSWD: /bin/mkdir -p /opt/*</pre>
+        <p class="text-xs text-panel-muted mt-2">Remplacez <code class="font-mono bg-panel-bg px-1 py-0.5 rounded">www-data</code> par l'utilisateur qui exécute gunicorn si différent.</p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ── TOAST NOTIFICATIONS ── -->
+  <div class="fixed bottom-4 right-4 z-50 space-y-2">
+    <template x-for="toast in toasts" :key="toast.id">
+      <div class="fade-in flex items-center gap-3 bg-panel-surface border rounded-lg px-4 py-3 shadow-xl text-sm"
+        :class="toast.type==='success' ? 'border-panel-green' : toast.type==='error' ? 'border-panel-red' : 'border-panel-border'">
+        <span x-text="toast.type==='success' ? '✓' : toast.type==='error' ? '✗' : 'ℹ'"
+          :class="toast.type==='success' ? 'text-panel-green' : toast.type==='error' ? 'text-panel-red' : 'text-panel-accent'"></span>
+        <span x-text="toast.message" class="text-panel-text"></span>
+      </div>
+    </template>
+  </div>
+
+<script>
+function panelApp() {
+  return {
+    activeTab: 'dashboard',
+    demoMode: {{ 'true' if demo_mode else 'false' }},
+    refreshing: false,
+    lastRefresh: '',
+
+    // Stats
+    stats: {},
+    statsInterval: null,
+
+    // Services
+    services: [],
+    servicesLoading: false,
+    serviceFilter: '',
+    serviceStatusFilter: 'tous',
+    actionPending: null,
+    serviceStats: { active: 0, inactive: 0, failed: 0 },
+
+    // Logs
+    logsPanel: { visible: false, service: '', content: '', loading: false },
+
+    // Deploy
+    deployForm: {
+      parent_path: '/opt',
+      app_name: '',
+      domain: '',
+      routing_type: 'subfolder',
+      port: 8100,
+      workers: 3,
+      wsgi_module: 'wsgi:app',
+    },
+    deploying: false,
+    deployResult: null,
+    showGeneratedFiles: false,
+    servicePreview: '',
+    nginxDomains: [],
+
+    // Toasts
+    toasts: [],
+
+    get tabTitle() {
+      const map = { dashboard: 'Dashboard Monitoring', services: 'Gestionnaire de Services', deploy: 'Déployer une Application' };
+      return map[this.activeTab] || '';
+    },
+
+    get cpuColor() {
+      const p = this.stats.cpu?.percent || 0;
+      if (p > 80) return 'bg-panel-red';
+      if (p > 60) return 'bg-panel-yellow';
+      return 'bg-panel-accent';
+    },
+
+    get ramColor() {
+      const p = this.stats.ram?.percent || 0;
+      if (p > 85) return 'bg-panel-red';
+      if (p > 70) return 'bg-panel-yellow';
+      return 'bg-panel-green';
+    },
+
+    get filteredServices() {
+      return this.services.filter(s => {
+        const matchName = s.name.toLowerCase().includes(this.serviceFilter.toLowerCase()) ||
+                          (s.description || '').toLowerCase().includes(this.serviceFilter.toLowerCase());
+        const matchStatus = this.serviceStatusFilter === 'tous' || s.status === this.serviceStatusFilter;
+        return matchName && matchStatus;
+      });
+    },
+
+    async init() {
+      await this.fetchStats();
+      await this.loadServices();
+      this.statsInterval = setInterval(() => this.fetchStats(), 4000);
+    },
+
+    async fetchStats() {
+      try {
+        const r = await fetch('/api/system-stats');
+        this.stats = await r.json();
+        this.lastRefresh = new Date().toLocaleTimeString('fr-FR');
+      } catch (e) {
+        console.error('Erreur stats:', e);
+      }
+    },
+
+    async loadServices() {
+      this.servicesLoading = true;
+      try {
+        const r = await fetch('/api/services');
+        const data = await r.json();
+        this.services = data.services || [];
+        this.serviceStats = {
+          active: this.services.filter(s => s.status === 'active').length,
+          inactive: this.services.filter(s => s.status === 'inactive').length,
+          failed: this.services.filter(s => s.status === 'failed').length,
+        };
+      } catch (e) {
+        this.showToast('Erreur chargement services', 'error');
+      } finally {
+        this.servicesLoading = false;
+      }
+    },
+
+    async serviceAction(name, action) {
+      this.actionPending = name;
+      try {
+        const r = await fetch(`/api/services/${name}/${action}`, { method: 'POST' });
+        const data = await r.json();
+        if (data.success) {
+          this.showToast(`${action} ${name}${data.demo ? ' [DÉMO]' : ''} ✓`, 'success');
+          setTimeout(() => this.loadServices(), 1500);
+        } else {
+          this.showToast(`Erreur: ${data.error || data.message}`, 'error');
+        }
+      } catch (e) {
+        this.showToast('Erreur réseau', 'error');
+      } finally {
+        this.actionPending = null;
+      }
+    },
+
+    async openLogs(name) {
+      this.logsPanel = { visible: true, service: name, content: '', loading: true };
+      await this.loadLogs(name);
+      this.$nextTick(() => {
+        if (this.$refs.logConsole) {
+          this.$refs.logConsole.scrollTop = this.$refs.logConsole.scrollHeight;
+        }
+      });
+    },
+
+    async loadLogs(name) {
+      this.logsPanel.loading = true;
+      try {
+        const r = await fetch(`/api/services/${name}/logs?lines=100`);
+        const data = await r.json();
+        this.logsPanel.content = data.logs || 'Aucun log disponible';
+        this.logsPanel.loading = false;
+        this.$nextTick(() => {
+          if (this.$refs.logConsole) {
+            this.$refs.logConsole.scrollTop = this.$refs.logConsole.scrollHeight;
+          }
+        });
+      } catch (e) {
+        this.logsPanel.content = 'Erreur lors du chargement des logs';
+        this.logsPanel.loading = false;
+      }
+    },
+
+    async loadPorts() {
+      try {
+        const r = await fetch('/api/ports/scan');
+        const data = await r.json();
+        this.deployForm.port = data.suggested_port;
+        this.showToast(`Port libre suggéré: ${data.suggested_port}`, 'info');
+      } catch (e) {
+        this.showToast('Erreur scan ports', 'error');
+      }
+    },
+
+    async loadDomains() {
+      try {
+        const r = await fetch('/api/nginx/domains');
+        const data = await r.json();
+        this.nginxDomains = data.domains || [];
+      } catch (e) {}
+    },
+
+    previewServiceFile() {
+      const p = this.deployForm;
+      const projectPath = `${p.parent_path}/${p.app_name}`;
+      const key = 'PREVIEW_KEY_' + Math.random().toString(36).substr(2, 12).toUpperCase();
+      this.servicePreview = `[Unit]
+Description=Service Automatise - ${p.app_name || 'mon-app'}
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=${projectPath}
+Environment="PATH=${projectPath}/venv/bin"
+Environment="FLASK_SECRET_KEY=${key}"
+ExecStart=${projectPath}/venv/bin/gunicorn --workers ${p.workers} --bind 127.0.0.1:${p.port} --timeout 120 --access-logfile - --error-logfile - ${p.wsgi_module}
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=${p.app_name || 'mon-app'}
+
+[Install]
+WantedBy=multi-user.target`;
+    },
+
+    async deploy() {
+      if (!this.deployForm.app_name || !this.deployForm.domain || !this.deployForm.port) {
+        this.showToast('Remplissez tous les champs obligatoires', 'error');
+        return;
+      }
+      this.deploying = true;
+      this.deployResult = null;
+      this.showGeneratedFiles = false;
+      try {
+        const r = await fetch('/api/deploy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.deployForm),
+        });
+        this.deployResult = await r.json();
+        if (this.deployResult.success) {
+          this.showToast('Déploiement réussi !', 'success');
+          setTimeout(() => { this.activeTab = 'services'; this.loadServices(); }, 2000);
+        } else {
+          this.showToast('Déploiement échoué — voir détails', 'error');
+        }
+      } catch (e) {
+        this.showToast('Erreur réseau', 'error');
+      } finally {
+        this.deploying = false;
+      }
+    },
+
+    async refreshAll() {
+      this.refreshing = true;
+      await this.fetchStats();
+      if (this.activeTab === 'services') await this.loadServices();
+      setTimeout(() => { this.refreshing = false; }, 600);
+    },
+
+    showToast(message, type = 'info') {
+      const id = Date.now();
+      this.toasts.push({ id, message, type });
+      setTimeout(() => { this.toasts = this.toasts.filter(t => t.id !== id); }, 4000);
+    },
+  };
+}
+</script>
+</body>
+</html>
