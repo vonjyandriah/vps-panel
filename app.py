@@ -615,6 +615,270 @@ def nginx_domains():
 
 
 # ─────────────────────────────────────────────────────────
+#  API — SCAN APPS EXISTANTES (uniformisation)
+# ─────────────────────────────────────────────────────────
+
+DEMO_SCAN_APPS = [
+    {"name": "gps-fleet-manager", "description": "GPS Fleet Manager - Application Flask",
+     "working_dir": "/opt/gps_fleet_manager_prod", "user": "root",
+     "port": 8000, "workers": 3, "wsgi_module": "wsgi:app", "is_standard": False},
+    {"name": "i-tracker-backend", "description": "i-Tracker Backend API",
+     "working_dir": "/opt/i-tracker/backend", "user": "root",
+     "port": 8001, "workers": 2, "wsgi_module": "wsgi:app", "is_standard": False},
+    {"name": "odometer", "description": "Odometer SaaS",
+     "working_dir": "/opt/odometer", "user": "root",
+     "port": 8002, "workers": 3, "wsgi_module": "wsgi:app", "is_standard": True},
+    {"name": "money-manager", "description": "Flask money-manager",
+     "working_dir": "/opt/money_manager", "user": "root",
+     "port": 8003, "workers": 2, "wsgi_module": "app:app", "is_standard": False},
+]
+
+
+def parse_service_file(path: Path) -> dict | None:
+    """Parse a systemd .service file and return info if gunicorn-based."""
+    try:
+        content = path.read_text()
+    except Exception:
+        return None
+    if "gunicorn" not in content:
+        return None
+
+    def extract(pattern, default=""):
+        m = re.search(pattern, content, re.MULTILINE)
+        return m.group(1).strip() if m else default
+
+    name = path.stem
+    working_dir = extract(r"^WorkingDirectory=(.+)$")
+    user = extract(r"^User=(.+)$", "root")
+    description = extract(r"^Description=(.+)$", name)
+    exec_start = extract(r"^ExecStart=(.+)$")
+
+    port, workers, wsgi_module = None, 3, "wsgi:app"
+    if exec_start:
+        m = re.search(r"--bind\s+\S+:(\d+)", exec_start)
+        if m:
+            port = int(m.group(1))
+        m = re.search(r"--workers\s+(\d+)", exec_start)
+        if m:
+            workers = int(m.group(1))
+        parts = exec_start.strip().split()
+        if parts and not parts[-1].startswith("-"):
+            wsgi_module = parts[-1]
+
+    is_standard = "FLASK_SECRET_KEY" in content and "Service Automatise" in content
+
+    return {
+        "name": name,
+        "description": description,
+        "working_dir": working_dir,
+        "user": user,
+        "port": port,
+        "workers": workers,
+        "wsgi_module": wsgi_module,
+        "is_standard": is_standard,
+    }
+
+
+@app.route("/api/scan/apps")
+@login_required
+def scan_apps():
+    if not IS_VPS:
+        return jsonify({"apps": DEMO_SCAN_APPS, "demo": True})
+
+    apps = []
+    for svc_file in SYSTEMD_DIR.glob("*.service"):
+        parsed = parse_service_file(svc_file)
+        if parsed:
+            apps.append(parsed)
+
+    return jsonify({"apps": sorted(apps, key=lambda x: x["name"]), "demo": False})
+
+
+@app.route("/api/apps/<name>/normalize", methods=["POST"])
+@login_required
+def normalize_app(name: str):
+    if not re.match(r"^[a-zA-Z0-9_\-]+$", name):
+        return jsonify({"success": False, "error": "Nom invalide"}), 400
+
+    data = request.get_json(force=True)
+    working_dir = data.get("working_dir", "")
+    port = int(data.get("port", 8000))
+    workers = int(data.get("workers", 3))
+    wsgi_module = data.get("wsgi_module", "wsgi:app")
+
+    service_content = generate_service_file(name, working_dir, port, workers, wsgi_module)
+
+    if not IS_VPS:
+        return jsonify({"success": True, "demo": True, "service_file": service_content,
+                        "message": f"[DÉMO] Service {name} normalisé"})
+
+    service_path = SYSTEMD_DIR / f"{name}.service"
+    try:
+        if service_path.exists():
+            service_path.with_suffix(".service.bak").write_text(service_path.read_text())
+        service_path.write_text(service_content)
+        run_cmd(["systemctl", "daemon-reload"])
+        rc, out, err = run_cmd(["systemctl", "restart", f"{name}.service"])
+        return jsonify({
+            "success": rc == 0,
+            "demo": False,
+            "service_file": service_content,
+            "message": out or err or f"Service {name} normalisé et redémarré",
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
+# ─────────────────────────────────────────────────────────
+#  API — GIT (clone / pull)
+# ─────────────────────────────────────────────────────────
+
+@app.route("/api/git/clone", methods=["POST"])
+@login_required
+def git_clone():
+    data = request.get_json(force=True)
+    url = data.get("url", "").strip()
+    target = data.get("target_path", "").strip().rstrip("/")
+    branch = data.get("branch", "").strip()
+
+    if not url or not target:
+        return jsonify({"success": False, "error": "URL et chemin cible requis"}), 400
+
+    if not IS_VPS:
+        folder = url.rstrip("/").split("/")[-1].replace(".git", "")
+        return jsonify({
+            "success": True, "demo": True,
+            "output": (
+                f"[DÉMO] git clone {url} {target}/{folder}\n"
+                f"Cloning into '{folder}'...\n"
+                "remote: Enumerating objects: 120, done.\n"
+                "remote: Counting objects: 100% (120/120), done.\n"
+                "Receiving objects: 100% (120/120), 248.5 KiB | 2.1 MiB/s, done.\n"
+                "Done."
+            ),
+        })
+
+    try:
+        Path(target).mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+    cmd = ["git", "clone"]
+    if branch:
+        cmd += ["-b", branch]
+    cmd += [url, target]
+    rc, out, err = run_cmd(cmd)
+    return jsonify({"success": rc == 0, "output": out or err, "demo": False})
+
+
+@app.route("/api/git/pull", methods=["POST"])
+@login_required
+def git_pull():
+    data = request.get_json(force=True)
+    project_path = data.get("project_path", "").strip()
+
+    if not project_path:
+        return jsonify({"success": False, "error": "Chemin du projet requis"}), 400
+
+    if not IS_VPS:
+        return jsonify({
+            "success": True, "demo": True,
+            "output": (
+                f"[DÉMO] git -C {project_path} pull\n"
+                "From https://github.com/owner/repo\n"
+                "   abc1234..def5678  main -> origin/main\n"
+                "Updating abc1234..def5678\nFast-forward\n"
+                " 3 files changed, 42 insertions(+), 5 deletions(-)"
+            ),
+        })
+
+    rc, out, err = run_cmd(["git", "-C", project_path, "pull"])
+    return jsonify({"success": rc == 0, "output": out or err, "demo": False})
+
+
+# ─────────────────────────────────────────────────────────
+#  API — UPLOAD FICHIERS
+# ─────────────────────────────────────────────────────────
+
+@app.route("/api/upload", methods=["POST"])
+@login_required
+def upload_file():
+    target_dir = request.form.get("target_dir", "").strip()
+    if not target_dir:
+        return jsonify({"success": False, "error": "Répertoire cible requis"}), 400
+    if "files" not in request.files:
+        return jsonify({"success": False, "error": "Aucun fichier fourni"}), 400
+
+    results = []
+    for f in request.files.getlist("files"):
+        if not f.filename:
+            continue
+        safe_name = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", f.filename)
+        if not IS_VPS:
+            results.append({"name": f.filename, "ok": True,
+                             "detail": f"[DÉMO] → {target_dir}/{safe_name}"})
+            continue
+        try:
+            dest = Path(target_dir) / safe_name
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            f.save(str(dest))
+            results.append({"name": f.filename, "ok": True, "detail": str(dest)})
+        except Exception as e:
+            results.append({"name": f.filename, "ok": False, "detail": str(e)})
+
+    return jsonify({
+        "success": all(r["ok"] for r in results),
+        "results": results,
+        "demo": not IS_VPS,
+    })
+
+
+# ─────────────────────────────────────────────────────────
+#  API — SETUP SUDOERS (auto-configuration)
+# ─────────────────────────────────────────────────────────
+
+@app.route("/api/setup/sudoers", methods=["POST"])
+@login_required
+def setup_sudoers():
+    data = request.get_json(force=True)
+    run_user = re.sub(r"[^a-zA-Z0-9_\-]", "", data.get("run_user", "www-data"))
+
+    sudoers_lines = [
+        f"# VPS Admin Panel — règles auto-générées le {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        f"{run_user} ALL=(ALL) NOPASSWD: /bin/systemctl start *",
+        f"{run_user} ALL=(ALL) NOPASSWD: /bin/systemctl stop *",
+        f"{run_user} ALL=(ALL) NOPASSWD: /bin/systemctl restart *",
+        f"{run_user} ALL=(ALL) NOPASSWD: /bin/systemctl enable *",
+        f"{run_user} ALL=(ALL) NOPASSWD: /bin/systemctl disable *",
+        f"{run_user} ALL=(ALL) NOPASSWD: /bin/systemctl daemon-reload",
+        f"{run_user} ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx",
+        f"{run_user} ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t",
+        f"{run_user} ALL=(ALL) NOPASSWD: /bin/mkdir -p /etc/nginx/*",
+        f"{run_user} ALL=(ALL) NOPASSWD: /bin/mkdir -p /opt/*",
+    ]
+    sudoers_content = "\n".join(sudoers_lines) + "\n"
+
+    if not IS_VPS:
+        return jsonify({"success": True, "demo": True,
+                        "message": f"[DÉMO] Règles sudoers pour '{run_user}' générées",
+                        "content": sudoers_content})
+
+    sudoers_path = Path("/etc/sudoers.d/vps-panel")
+    try:
+        sudoers_path.write_text(sudoers_content)
+        sudoers_path.chmod(0o440)
+        rc, out, err = run_cmd(["visudo", "-c", "-f", str(sudoers_path)])
+        if rc != 0:
+            sudoers_path.unlink(missing_ok=True)
+            return jsonify({"success": False, "error": f"Fichier sudoers invalide: {err}"})
+        return jsonify({"success": True, "demo": False,
+                        "message": f"Règles appliquées → /etc/sudoers.d/vps-panel",
+                        "content": sudoers_content})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
+# ─────────────────────────────────────────────────────────
 #  POINT D'ENTRÉE
 # ─────────────────────────────────────────────────────────
 
