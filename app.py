@@ -730,8 +730,61 @@ def normalize_app(name: str):
 
 
 # ─────────────────────────────────────────────────────────
-#  API — GIT (clone / pull)
+#  API — GIT (repos scan / clone / pull)
 # ─────────────────────────────────────────────────────────
+
+DEMO_GIT_REPOS = [
+    {"name": "gps-fleet-manager",  "path": "/opt/gps-fleet-manager",  "branch": "main",    "last_commit": "abc1234 Fix GPS timeout (2 jours)"},
+    {"name": "i-tracker-backend",  "path": "/opt/i-tracker/backend",  "branch": "main",    "last_commit": "def5678 Add webhook endpoint (5 jours)"},
+    {"name": "odometer",           "path": "/opt/odometer",           "branch": "develop", "last_commit": "aaa9999 Refactor billing (1 heure)"},
+    {"name": "money-manager",      "path": "/opt/money-manager",      "branch": "main",    "last_commit": "bbb0001 Update deps (3 semaines)"},
+]
+
+
+@app.route("/api/git/repos")
+@login_required
+def git_repos():
+    """Scan a base directory recursively (max 2 levels) for .git repos."""
+    base = request.args.get("base", "/opt").strip().rstrip("/")
+
+    if not IS_VPS:
+        return jsonify({"repos": DEMO_GIT_REPOS, "base": "/opt", "demo": True})
+
+    base_path = Path(base)
+    if not base_path.exists():
+        return jsonify({"repos": [], "base": base, "demo": False,
+                        "error": f"Chemin {base} introuvable"})
+
+    repos = []
+    # Check depth 1 and 2
+    candidates = list(base_path.iterdir())
+    for d in list(candidates):
+        if d.is_dir():
+            candidates += [sub for sub in d.iterdir() if sub.is_dir()]
+
+    for d in candidates:
+        if not d.is_dir():
+            continue
+        if not (d / ".git").exists():
+            continue
+        path_str = str(d)
+        # Get current branch
+        _, branch, _ = run_cmd(["git", "-C", path_str, "branch", "--show-current"])
+        branch = branch.strip() or "unknown"
+        # Get last commit (short)
+        _, commit, _ = run_cmd(["git", "-C", path_str, "log", "-1",
+                                 "--format=%h %s (%cr)"])
+        commit = commit.strip() or "—"
+        repos.append({
+            "name": d.name,
+            "path": path_str,
+            "branch": branch,
+            "last_commit": commit,
+        })
+
+    repos.sort(key=lambda x: x["name"])
+    return jsonify({"repos": repos, "base": base, "demo": False})
+
 
 @app.route("/api/git/clone", methods=["POST"])
 @login_required

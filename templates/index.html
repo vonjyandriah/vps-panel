@@ -826,29 +826,65 @@
         </div>
       </div>
 
-      <!-- Git Pull -->
+      <!-- Git Pull — scan dynamique -->
       <div class="bg-panel-surface border border-panel-border rounded-xl p-5">
-        <div class="flex items-center gap-2 mb-4">
-          <svg class="w-5 h-5 text-panel-green" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-          </svg>
-          <h2 class="text-base font-semibold text-white">Mettre à jour un projet <span class="text-panel-muted font-normal text-sm">(git pull)</span></h2>
-        </div>
-        <div class="flex gap-3">
-          <input x-model="gitPullPath" placeholder="/opt/mon-app"
-            class="flex-1 bg-panel-bg border border-panel-border rounded-lg px-3 py-2.5 text-sm font-mono text-panel-text placeholder-panel-muted focus:outline-none focus:border-panel-accent transition-colors"/>
-          <button @click="doGitPull()" :disabled="gitPullLoading"
-            class="flex items-center gap-2 px-4 py-2.5 bg-panel-bg border border-panel-green text-panel-green hover:bg-green-900/20 rounded-lg text-sm transition-colors disabled:opacity-50">
-            <svg x-show="gitPullLoading" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-panel-green" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
             </svg>
-            <span x-text="gitPullLoading ? 'Pull…' : '↓ git pull'"></span>
-          </button>
+            <h2 class="text-base font-semibold text-white">Mettre à jour un projet <span class="text-panel-muted font-normal text-sm">(git pull)</span></h2>
+          </div>
+          <!-- Base path + scan -->
+          <div class="flex items-center gap-2">
+            <input x-model="gitReposBase" placeholder="/opt"
+              class="w-36 bg-panel-bg border border-panel-border rounded-lg px-3 py-1.5 text-xs font-mono text-panel-text placeholder-panel-muted focus:outline-none focus:border-panel-accent transition-colors"/>
+            <button @click="scanGitRepos()" :disabled="gitReposLoading"
+              class="flex items-center gap-1.5 px-3 py-1.5 bg-panel-bg border border-panel-border text-panel-muted hover:text-white hover:border-panel-accent rounded-lg text-xs transition-colors disabled:opacity-50">
+              <svg :class="gitReposLoading && 'animate-spin'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+              <span x-text="gitReposLoading ? 'Scan…' : 'Scanner'"></span>
+            </button>
+          </div>
         </div>
-        <div x-show="gitPullOutput" x-cloak class="mt-3 fade-in">
-          <pre class="log-console p-3 rounded text-xs overflow-x-auto"
-            :class="gitPullSuccess ? 'text-panel-green' : 'text-panel-red'"
-            x-text="gitPullOutput"></pre>
+
+        <!-- Liste des repos détectés -->
+        <div x-show="gitRepos.length === 0 && !gitReposLoading" class="text-center py-6 text-panel-muted text-sm">
+          <p>Aucun dépôt Git détecté — cliquez sur <strong>Scanner</strong> pour analyser <span class="font-mono" x-text="gitReposBase"></span></p>
+        </div>
+        <div x-show="gitReposLoading" class="text-center py-6 text-panel-muted text-sm">Recherche des dépôts Git…</div>
+
+        <div x-show="gitRepos.length > 0" class="space-y-2">
+          <template x-for="repo in gitRepos" :key="repo.path">
+            <div class="bg-panel-bg border border-panel-border rounded-lg px-4 py-3 flex items-center gap-4">
+              <!-- Info repo -->
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-0.5">
+                  <span class="font-mono text-sm text-panel-accent font-medium" x-text="repo.name"></span>
+                  <span class="px-1.5 py-0.5 rounded text-xs bg-panel-surface border border-panel-border text-panel-green font-mono"
+                    x-text="'⎇ ' + repo.branch"></span>
+                </div>
+                <div class="text-xs text-panel-muted font-mono truncate" x-text="repo.path"></div>
+                <div class="text-xs text-panel-muted mt-0.5 truncate" x-text="repo.last_commit"></div>
+              </div>
+              <!-- Bouton pull -->
+              <button @click="doGitPull(repo.path)"
+                :disabled="gitPullLoading === repo.path"
+                class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-panel-bg border border-panel-green text-panel-green hover:bg-green-900/20 rounded-lg text-xs transition-colors disabled:opacity-50">
+                <svg :class="gitPullLoading === repo.path && 'animate-spin'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                <span x-text="gitPullLoading === repo.path ? 'Pull…' : '↓ Pull'"></span>
+              </button>
+            </div>
+            <!-- Output pull par repo -->
+            <div x-show="gitPullOutputs[repo.path]" x-cloak class="fade-in ml-2">
+              <pre class="log-console p-3 rounded text-xs overflow-x-auto"
+                :class="gitPullResults[repo.path] ? 'text-panel-green' : 'text-panel-red'"
+                x-text="gitPullOutputs[repo.path]"></pre>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -971,10 +1007,13 @@ function panelApp() {
     gitCloneLoading: false,
     gitCloneOutput: '',
     gitCloneSuccess: false,
-    gitPullPath: '',
-    gitPullLoading: false,
-    gitPullOutput: '',
-    gitPullSuccess: false,
+    // Git Pull — repos dynamiques
+    gitReposBase: '/opt',
+    gitRepos: [],
+    gitReposLoading: false,
+    gitPullLoading: null,   // stocke le path en cours de pull (null = aucun)
+    gitPullOutputs: {},     // { path: output_string }
+    gitPullResults: {},     // { path: true/false }
 
     // Upload
     uploadTargetDir: '',
@@ -1026,6 +1065,9 @@ function panelApp() {
     async init() {
       await this.fetchStats();
       await this.loadServices();
+      // Auto-scan au démarrage (import + repos git)
+      this.scanApps();
+      this.scanGitRepos();
       this.statsInterval = setInterval(() => this.fetchStats(), 4000);
     },
 
@@ -1252,28 +1294,46 @@ WantedBy=multi-user.target`;
       }
     },
 
-    async doGitPull() {
-      if (!this.gitPullPath) {
-        this.showToast('Chemin du projet requis', 'error');
-        return;
+    async scanGitRepos() {
+      this.gitReposLoading = true;
+      try {
+        const r = await fetch(`/api/git/repos?base=${encodeURIComponent(this.gitReposBase)}`);
+        const data = await r.json();
+        this.gitRepos = data.repos || [];
+        if (data.demo) this.showToast('Mode Démo — dépôts simulés', 'info');
+        else if (data.error) this.showToast(data.error, 'error');
+        else this.showToast(`${this.gitRepos.length} dépôt(s) Git trouvé(s)`, 'info');
+      } catch (e) {
+        this.showToast('Erreur scan repos', 'error');
+      } finally {
+        this.gitReposLoading = false;
       }
-      this.gitPullLoading = true;
-      this.gitPullOutput = '';
+    },
+
+    async doGitPull(projectPath) {
+      if (!projectPath) return;
+      this.gitPullLoading = projectPath;
+      this.gitPullOutputs = { ...this.gitPullOutputs, [projectPath]: '' };
       try {
         const r = await fetch('/api/git/pull', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ project_path: this.gitPullPath }),
+          body: JSON.stringify({ project_path: projectPath }),
         });
         const data = await r.json();
-        this.gitPullSuccess = data.success;
-        this.gitPullOutput = data.output || (data.success ? 'Pull réussi' : data.error);
-        if (data.success) this.showToast('git pull réussi ✓', 'success');
-        else this.showToast('Erreur git pull', 'error');
+        this.gitPullResults = { ...this.gitPullResults, [projectPath]: data.success };
+        this.gitPullOutputs = { ...this.gitPullOutputs, [projectPath]: data.output || (data.success ? 'Pull réussi' : data.error) };
+        if (data.success) {
+          this.showToast(`git pull ${projectPath.split('/').pop()} ✓`, 'success');
+          // Rafraîchir les infos du repo après pull
+          this.scanGitRepos();
+        } else {
+          this.showToast(`Erreur git pull: ${data.error || ''}`, 'error');
+        }
       } catch (e) {
         this.showToast('Erreur réseau', 'error');
       } finally {
-        this.gitPullLoading = false;
+        this.gitPullLoading = null;
       }
     },
 
@@ -1337,6 +1397,7 @@ WantedBy=multi-user.target`;
       await this.fetchStats();
       if (this.activeTab === 'services') await this.loadServices();
       if (this.activeTab === 'import') await this.scanApps();
+      if (this.activeTab === 'tools') await this.scanGitRepos();
       setTimeout(() => { this.refreshing = false; }, 600);
     },
 
