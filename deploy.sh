@@ -56,7 +56,8 @@ else
 
     read -rp "  Préfixe URL [/panel_admin] : " BASE_PATH
     BASE_PATH="${BASE_PATH:-/panel_admin}"
-    # Supprimer le slash final si présent
+    # Forcer le slash initial, supprimer le slash final
+    [[ "$BASE_PATH" != /* ]] && BASE_PATH="/$BASE_PATH"
     BASE_PATH="${BASE_PATH%/}"
 
     read -rp "  Port interne [9999] : " PORT
@@ -129,35 +130,49 @@ if command -v nginx &>/dev/null; then
         [[ -f "$f" ]] && grep -q "$DOMAIN" "$f" 2>/dev/null && DOMAIN_CONF="$f" && break
     done
 
+    # Générer le bloc location
+    LOCATION_BLOCK="
+    # VPS Admin Panel
+    location ${BASE_PATH} {
+        proxy_pass         http://127.0.0.1:${PORT};
+        proxy_set_header   Host               \$host;
+        proxy_set_header   X-Real-IP          \$remote_addr;
+        proxy_set_header   X-Forwarded-For    \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto  \$scheme;
+        proxy_set_header   X-Forwarded-Prefix ${BASE_PATH};
+    }"
+
     if [[ -n "$DOMAIN_CONF" ]]; then
         info "Config trouvée : $DOMAIN_CONF"
-        warn "Ajoutez manuellement ce bloc dans le server{} de $DOMAIN_CONF :"
+        # Vérifier si le bloc est déjà présent
+        if grep -q "location ${BASE_PATH}" "$DOMAIN_CONF"; then
+            warn "Bloc location ${BASE_PATH} déjà présent dans $DOMAIN_CONF — conservé"
+        else
+            # Injecter avant le dernier } du premier bloc server{}
+            cp "$DOMAIN_CONF" "${DOMAIN_CONF}.bak"
+            # Insérer le bloc juste avant la dernière accolade fermante
+            sed -i "0,/^}/s/^}/${LOCATION_BLOCK}\n}/" "$DOMAIN_CONF"
+            ok "Bloc injecté dans $DOMAIN_CONF (backup : ${DOMAIN_CONF}.bak)"
+        fi
     else
         warn "Config domaine non trouvée. Snippet créé dans $NGINX_SNIPPET"
+        cat > "$NGINX_SNIPPET" << EOF
+# VPS Admin Panel — bloc à inclure dans votre server {}
+${LOCATION_BLOCK}
+EOF
         warn "Incluez-le dans votre server{} avec : include $NGINX_SNIPPET;"
     fi
 
-    cat > "$NGINX_SNIPPET" << EOF
-# VPS Admin Panel — bloc à inclure dans votre server {}
-location ${BASE_PATH} {
-    proxy_pass         http://127.0.0.1:${PORT};
-    proxy_set_header   Host               \$host;
-    proxy_set_header   X-Real-IP          \$remote_addr;
-    proxy_set_header   X-Forwarded-For    \$proxy_add_x_forwarded_for;
-    proxy_set_header   X-Forwarded-Proto  \$scheme;
-    proxy_set_header   X-Forwarded-Prefix ${BASE_PATH};
-}
-EOF
-
-    echo -e "\n${YELLOW}  Bloc Nginx généré :${RESET}"
-    cat "$NGINX_SNIPPET"
+    echo -e "\n${YELLOW}  Bloc Nginx :${RESET}"
+    echo "$LOCATION_BLOCK"
     echo ""
 
     if nginx -t 2>/dev/null; then
         systemctl reload nginx
         ok "Nginx rechargé"
     else
-        warn "nginx -t a retourné des erreurs — vérifiez votre config avant de recharger"
+        warn "nginx -t a échoué — vérifiez $DOMAIN_CONF puis : nginx -t && systemctl reload nginx"
+        [[ -f "${DOMAIN_CONF}.bak" ]] && warn "Restauration possible : cp ${DOMAIN_CONF}.bak $DOMAIN_CONF"
     fi
 else
     warn "Nginx non installé — bloc Nginx ignoré"
