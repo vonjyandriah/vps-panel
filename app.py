@@ -391,10 +391,21 @@ def service_logs(name: str):
         ])
         return jsonify({"success": True, "logs": demo_logs, "demo": True})
 
+    # --since limite la fenêtre de scan → journalctl reste rapide même
+    # sur un VPS avec des mois de journaux accumulés.
+    # On essaie d'abord sur 7 jours ; si vide, on réessaie sans limite.
     rc, out, err = run_cmd([
         JOURNALCTL, "-u", f"{name}.service",
-        "-n", str(lines), "--no-pager", "--output=short"
-    ], timeout=30)
+        "-n", str(lines), "--no-pager", "--no-hostname",
+        "--output=short-iso", "--since", "7 days ago"
+    ], timeout=8)
+    if rc == 0 and not out.strip():
+        # Service peut-être vieux — réessai sans --since mais avec timeout court
+        rc, out, err = run_cmd([
+            JOURNALCTL, "-u", f"{name}.service",
+            "-n", str(lines), "--no-pager", "--no-hostname",
+            "--output=short-iso"
+        ], timeout=8)
     return jsonify({
         "success": rc == 0,
         "logs": out if rc == 0 else err,

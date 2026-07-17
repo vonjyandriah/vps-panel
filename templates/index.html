@@ -1308,8 +1308,11 @@ function panelApp() {
 
     async loadLogs(name) {
       this.logsPanel.loading = true;
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 12000); // 12s max côté client
       try {
-        const r = await fetch(PANEL_BASE + `/api/services/${name}/logs?lines=100`);
+        const r = await fetch(PANEL_BASE + `/api/services/${name}/logs?lines=100`, { signal: ctrl.signal });
+        clearTimeout(timer);
         const data = await r.json();
         this.logsPanel.content = data.logs || 'Aucun log disponible';
         this.logsPanel.loading = false;
@@ -1317,7 +1320,10 @@ function panelApp() {
           if (this.$refs.logConsole) this.$refs.logConsole.scrollTop = this.$refs.logConsole.scrollHeight;
         });
       } catch (e) {
-        this.logsPanel.content = 'Erreur lors du chargement des logs';
+        clearTimeout(timer);
+        this.logsPanel.content = e.name === 'AbortError'
+          ? '⏱ Timeout — journalctl trop lent. Essayez avec moins de lignes ou vérifiez le service.'
+          : 'Erreur lors du chargement des logs';
         this.logsPanel.loading = false;
       }
     },
