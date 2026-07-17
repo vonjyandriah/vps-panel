@@ -1,0 +1,83 @@
+root@vps117024:~# journalctl --rotate
+root@vps117024:~# journalctl --vacuum-time=7d
+Vacuuming done, freed 0B of archived journals from /run/log/journal.
+Vacuuming done, freed 0B of archived journals from /var/log/journal.
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000307364-00064d3126096ffd.journal (44.5M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000317419-00064d632ad3b5bb.journal (44.6M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000003278fc-00064d9d131f9499.journal (44.3M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000003379c4-00064dde55369d07.journal (44.0M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000003478dc-00064e1061c85284.journal (43.7M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-000000000035773f-00064e45c290a43c.journal (43.0M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000366c9b-00064e751c5c8851.journal (44.0M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000376f8d-00064ebe74f86a41.journal (44.3M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000003870b9-00064eecd00328c7.journal (43.3M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000003966be-00064f17f28f0195.journal (44.0M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000003a5f79-00064f4a3a09be88.journal (44.8M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000003b65a2-00064f8243c36505.journal (44.5M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000003c680f-00064fb8c1e4a699.journal (43.5M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000003d5e18-00064fe2403da26b.journal (42.8M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000003e4d2c-00065008b18c61cc.journal (44.9M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000003f577b-00065050bce48895.journal (45.1M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000406794-0006508dae12f202.journal (45.4M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000417b73-000650c994f4437a.journal (46.0M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000429796-000650f7a6be1b58.journal (42.9M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000004391cb-0006510952e0dfc9.journal (43.2M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000448d17-00065118d39ba96f.journal (43.0M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000458449-00065127b2c54426.journal (43.7M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000004682b8-00065136d84adb3b.journal (44.0M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000478498-00065157b4b9eb80.journal (43.8M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000004881eb-00065174669a4883.journal (45.8M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000499c8e-000651b648af45f6.journal (44.6M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000004aa216-000651dedf9fab82.journal (45.2M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000004bb0f1-00065210ff21f7ea.journal (68.1M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000004db179-0006522451ded5e3.journal (62.5M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000004f6843-0006523250f95a76.journal (59.3M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000005111b3-0006523f1d6196c9.journal (59.7M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-000000000052c29f-0006524caaad5ccc.journal (59.9M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-000000000054740e-00065259decb93cb.journal (59.3M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000561bed-000652666a32d5aa.journal (63.1M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-000000000057e285-00065275a9e6b419.journal (59.3M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000598b26-000652824b9de0a6.journal (62.7M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000005b433a-0006529051d7eb55.journal (59.0M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000005ce84c-0006529caa8ecb50.journal (59.7M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000005e9679-000652a9c71f9094.journal (63.2M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000605d12-000652b8d804a914.journal (63.3M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000621f85-000652c75fe59fd9.journal (62.3M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-000000000063d0b8-000652d4f62be2e2.journal (63.4M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000006593fa-000652e381b45803.journal (57.5M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000672762-000652ee8cab3918.journal (63.1M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-000000000068e6a4-000652fd14d8b11d.journal (58.2M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000006a7f04-000653087ef93ac2.journal (62.7M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000006c38c1-00065316732397f6.journal (62.5M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000006dee9b-000653243a30bdde.journal (62.7M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000006fa790-00065332006528f5.journal (59.8M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000007156a2-0006533f3d4b0eb5.journal (59.1M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-000000000072fb59-0006534ba48d4731.journal (58.7M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000749b19-00065357866de0a1.journal (62.6M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000007651b0-000653657e8f275d.journal (59.9M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000007804be-000653730824da85.journal (62.9M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-000000000079c02b-000653811fb1516f.journal (59.9M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000007b72dd-0006538eac1b92bb.journal (62.7M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000007d2cec-0006539ca899406a.journal (62.5M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000007ee2a6-000653aa8b954d30.journal (62.7M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000809b9c-000653b890dd9e71.journal (63.3M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000825d55-000653c71706382a.journal (59.6M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000008409e9-000653d4449b49aa.journal (49.5M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000008543af-000653ef4e0520b2.journal (44.4M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-000000000086438b-0006541f3af50ea8.journal (43.8M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000873bd1-0006544dd58af09d.journal (44.7M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000883ef1-0006547aedd95051.journal (45.0M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000894756-000654ad0dc44fc0.journal (44.7M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000008a49af-000654d58ef74543.journal (45.7M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000008b5647-000654fe8f3880dd.journal (44.8M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000008c5a57-00065536b347aa6f.journal (44.0M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000008d55db-0006556a32988270.journal (44.1M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000008e5176-00065592e20ea2c8.journal (43.7M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-00000000008f473b-000655c2782170c3.journal (43.9M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000904094-000655fcdf6d8637.journal (44.6M).
+Deleted archived journal /var/log/journal/07bcd88a35cb45ee97f63340edcd3809/system@1506d23a93ee496f8773d8a9172c0f28-0000000000914055-00065637d4027aa3.journal (43.1M).
+Vacuuming done, freed 3.7G of archived journals from /var/log/journal/07bcd88a35cb45ee97f63340edcd3809.
+root@vps117024:~# journalctl --disk-usage
+
+Archived and active journals take up 134.0M in the file system.
+root@vps117024:~# 
