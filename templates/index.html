@@ -1644,29 +1644,22 @@ WantedBy=multi-user.target`;
 }
 </script>
 
-<!-- Modal : contenu brut du fichier nginx -->
-<div x-data x-show="$store?.panel?.nginxConfigModal?.open || false" style="display:none"
-  x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-  @click.self="$dispatch('close-nginx-modal')">
-</div>
-<template x-if="true">
-  <div x-data="{ get m() { return panel().nginxConfigModal } }"
-    x-show="m.open" style="display:none" x-cloak
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-    <div class="bg-panel-surface border border-panel-border rounded-xl w-full max-w-3xl max-h-[80vh] flex flex-col shadow-2xl">
-      <!-- Header -->
-      <div class="flex items-center justify-between px-5 py-3 border-b border-panel-border flex-shrink-0">
-        <div>
-          <p class="text-sm font-semibold text-panel-text" x-text="m.name"></p>
-          <p class="text-xs font-mono text-panel-muted" x-text="m.path"></p>
-        </div>
-        <button @click="m.open=false" class="text-panel-muted hover:text-white transition-colors text-xl leading-none">&times;</button>
+<!-- Modal : contenu brut du fichier nginx (dans le scope x-data="panelApp()") -->
+<div x-show="nginxConfigModal.open" x-cloak style="display:none"
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+  @click.self="nginxConfigModal.open=false" @keydown.escape.window="nginxConfigModal.open=false">
+  <div class="bg-panel-surface border border-panel-border rounded-xl w-full max-w-3xl max-h-[80vh] flex flex-col shadow-2xl">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-panel-border flex-shrink-0">
+      <div>
+        <p class="text-sm font-semibold text-panel-text" x-text="nginxConfigModal.name"></p>
+        <p class="text-xs font-mono text-panel-muted" x-text="nginxConfigModal.path"></p>
       </div>
-      <!-- Content -->
-      <pre class="overflow-auto flex-1 p-4 text-xs font-mono text-panel-text bg-panel-bg rounded-b-xl whitespace-pre-wrap break-all"
-        x-text="m.content"></pre>
+      <button @click="nginxConfigModal.open=false"
+        class="text-panel-muted hover:text-white transition-colors text-xl leading-none">&times;</button>
     </div>
+    <pre class="overflow-auto flex-1 p-4 text-xs font-mono text-panel-text bg-panel-bg rounded-b-xl whitespace-pre-wrap break-all"
+      x-text="nginxConfigModal.content"></pre>
   </div>
-</template>
+</div>
 </body>
 </html>
