@@ -391,24 +391,74 @@ def service_logs(name: str):
         ])
         return jsonify({"success": True, "logs": demo_logs, "demo": True})
 
-    # --since limite la fenêtre de scan → journalctl reste rapide même
-    # sur un VPS avec des mois de journaux accumulés.
-    # On essaie d'abord sur 7 jours ; si vide, on réessaie sans limite.
-    rc, out, err = run_cmd([
-        JOURNALCTL, "-u", f"{name}.service",
-        "-n", str(lines), "--no-pager", "--no-hostname",
-        "--output=short-iso", "--since", "7 days ago"
-    ], timeout=8)
-    if rc == 0 and not out.strip():
-        # Service peut-être vieux — réessai sans --since mais avec timeout court
-        rc, out, err = run_cmd([
+    # ── Stratégie multi-fallback ──────────────────────────────────────────
+    # journalctl peut être corrompu/bloqué sur certains VPS.
+    # On tente plusieurs sources dans l'ordre, avec des timeouts courts.
+
+    def _journalctl_fast(since: str, timeout: int) -> tuple[int, str, str]:
+        """journalctl limité à une fenêtre de temps récente."""
+        return run_cmd([
             JOURNALCTL, "-u", f"{name}.service",
             "-n", str(lines), "--no-pager", "--no-hostname",
-            "--output=short-iso"
-        ], timeout=8)
+            "--output=short-iso", "--since", since,
+        ], timeout=timeout)
+
+    def _syslog_grep() -> str | None:
+        """Lit /var/log/syslog ou /var/log/messages et filtre par service."""
+        for logfile in ["/var/log/syslog", "/var/log/messages"]:
+            p = Path(logfile)
+            if not p.exists():
+                continue
+            try:
+                rc2, out2, _ = run_cmd(
+                    ["grep", "-i", name, logfile], timeout=4
+                )
+                if rc2 == 0 and out2.strip():
+                    # Garder les N dernières lignes
+                    tail = out2.strip().splitlines()
+                    return "\n".join(tail[-lines:])
+            except Exception:
+                pass
+        return None
+
+    def _systemctl_status() -> str:
+        """systemctl status est toujours rapide, donne les derniers logs."""
+        rc2, out2, err2 = run_cmd(
+            [SYSTEMCTL, "status", f"{name}.service", "--no-pager", "-l"],
+            timeout=5
+        )
+        return (out2 or err2 or "").strip()
+
+    source = "journalctl"
+    result = ""
+
+    # 1. journalctl — dernière heure (le plus rapide même avec journal chargé)
+    rc, out, err = _journalctl_fast("1 hour ago", 4)
+    if rc == 0 and out.strip():
+        result = out.strip()
+    else:
+        # 2. journalctl — 7 derniers jours
+        rc, out, err = _journalctl_fast("7 days ago", 5)
+        if rc == 0 and out.strip():
+            result = out.strip()
+        else:
+            # 3. /var/log/syslog ou /var/log/messages
+            source = "syslog"
+            sl = _syslog_grep()
+            if sl:
+                result = sl
+            else:
+                # 4. systemctl status — toujours disponible
+                source = "systemctl status"
+                result = _systemctl_status()
+                if not result:
+                    result = "⚠ Impossible de récupérer les logs (journalctl bloqué, syslog vide).\n" \
+                             "Sur le VPS : journalctl --rotate && journalctl --vacuum-size=200M && systemctl restart systemd-journald"
+
     return jsonify({
-        "success": rc == 0,
-        "logs": out if rc == 0 else err,
+        "success": True,
+        "logs": result,
+        "source": source,
         "demo": False,
     })
 

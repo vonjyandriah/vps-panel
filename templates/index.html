@@ -460,7 +460,7 @@
           <div class="flex items-center justify-between px-4 py-2.5 border-b border-panel-border">
             <div class="flex items-center gap-2">
               <span class="w-2 h-2 rounded-full bg-panel-green pulse-dot"></span>
-              <span class="text-xs font-mono text-panel-accent" x-text="'journalctl -u ' + logsPanel.service + '.service -n 100'"></span>
+              <span class="text-xs font-mono text-panel-accent" x-text="logsPanel.source ? '[source: ' + logsPanel.source + '] ' + logsPanel.service : 'journalctl -u ' + logsPanel.service + '.service'"></span>
             </div>
             <div class="flex items-center gap-2">
               <button @click="loadLogs(logsPanel.service)" class="text-xs text-panel-muted hover:text-white">↺</button>
@@ -1147,7 +1147,7 @@ function panelApp() {
     serviceStats: { active: 0, inactive: 0, failed: 0 },
 
     // Logs
-    logsPanel: { visible: false, service: '', content: '', loading: false },
+    logsPanel: { visible: false, service: '', content: '', loading: false, source: '' },
 
     // Deploy
     deployForm: {
@@ -1299,7 +1299,7 @@ function panelApp() {
     },
 
     async openLogs(name) {
-      this.logsPanel = { visible: true, service: name, content: '', loading: true };
+      this.logsPanel = { visible: true, service: name, content: '', loading: true, source: '' };
       await this.loadLogs(name);
       this.$nextTick(() => {
         if (this.$refs.logConsole) this.$refs.logConsole.scrollTop = this.$refs.logConsole.scrollHeight;
@@ -1315,6 +1315,7 @@ function panelApp() {
         clearTimeout(timer);
         const data = await r.json();
         this.logsPanel.content = data.logs || 'Aucun log disponible';
+        this.logsPanel.source = data.source || 'journalctl';
         this.logsPanel.loading = false;
         this.$nextTick(() => {
           if (this.$refs.logConsole) this.$refs.logConsole.scrollTop = this.$refs.logConsole.scrollHeight;
