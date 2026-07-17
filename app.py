@@ -29,6 +29,14 @@ PANEL_BASE_PATH = os.environ.get("PANEL_BASE_PATH", "")  # ex: "/panel_admin"
 # (le PATH du service ne contient pas /bin ni /usr/bin)
 SYSTEMCTL   = shutil.which("systemctl")   or "/bin/systemctl"
 JOURNALCTL  = shutil.which("journalctl")  or "/bin/journalctl"
+SUDO        = shutil.which("sudo")        or "/usr/bin/sudo"
+
+def _is_root() -> bool:
+    return os.geteuid() == 0
+
+def sudo(cmd: list[str]) -> list[str]:
+    """Préfixe la commande avec sudo si le panel ne tourne pas en root."""
+    return cmd if _is_root() else [SUDO, "-n"] + cmd
 
 
 # ─────────────────────────────────────────────────────────
@@ -358,7 +366,7 @@ def service_action(name: str, action: str):
             "demo": True,
         })
 
-    rc, out, err = run_cmd([SYSTEMCTL, action, f"{name}.service"])
+    rc, out, err = run_cmd(sudo([SYSTEMCTL, action, f"{name}.service"]), timeout=30)
     return jsonify({
         "success": rc == 0,
         "message": out or err or f"Action {action} exécutée",
@@ -697,18 +705,18 @@ def deploy():
         return jsonify({"success": False, "steps": steps})
 
     # Étape 5 : daemon-reload
-    rc, out, err = run_cmd([SYSTEMCTL, "daemon-reload"])
+    rc, out, err = run_cmd(sudo([SYSTEMCTL, "daemon-reload"]))
     steps.append({"step": "systemctl daemon-reload", "ok": rc == 0, "detail": out or err or "OK"})
 
     # Étape 6 : enable + démarrage
-    rc, out, err = run_cmd([SYSTEMCTL, "enable", "--now", f"{app_name}.service"])
+    rc, out, err = run_cmd(sudo([SYSTEMCTL, "enable", "--now", f"{app_name}.service"]), timeout=30)
     steps.append({"step": f"systemctl enable --now {app_name}", "ok": rc == 0,
                    "detail": out or err or "Service activé et démarré"})
 
     # Étape 7 : Test + reload Nginx
-    rc_test, out_test, err_test = run_cmd(["nginx", "-t"])
+    rc_test, out_test, err_test = run_cmd(sudo(["nginx", "-t"]))
     if rc_test == 0:
-        rc_reload, out_reload, err_reload = run_cmd([SYSTEMCTL, "reload", "nginx"])
+        rc_reload, out_reload, err_reload = run_cmd(sudo([SYSTEMCTL, "reload", "nginx"]))
         steps.append({"step": "nginx -t && systemctl reload nginx", "ok": rc_reload == 0,
                        "detail": out_reload or err_reload or "nginx rechargé"})
     else:
@@ -891,7 +899,7 @@ def nginx_reload():
     rc_test, _, err_test = run_cmd(["nginx", "-t"])
     if rc_test != 0:
         return jsonify({"success": False, "message": f"Config invalide : {err_test}"})
-    rc, out, err = run_cmd([SYSTEMCTL, "reload", "nginx"])
+    rc, out, err = run_cmd(sudo([SYSTEMCTL, "reload", "nginx"]))
     return jsonify({"success": rc == 0, "message": out or err or "nginx rechargé", "demo": False})
 
 
@@ -1030,8 +1038,8 @@ def normalize_app(name: str):
         if service_path.exists():
             service_path.with_suffix(".service.bak").write_text(service_path.read_text())
         service_path.write_text(service_content)
-        run_cmd([SYSTEMCTL, "daemon-reload"])
-        rc, out, err = run_cmd([SYSTEMCTL, "restart", f"{name}.service"])
+        run_cmd(sudo([SYSTEMCTL, "daemon-reload"]))
+        rc, out, err = run_cmd(sudo([SYSTEMCTL, "restart", f"{name}.service"]), timeout=30)
         return jsonify({
             "success": rc == 0,
             "demo": False,
@@ -1209,16 +1217,19 @@ def setup_sudoers():
     data = request.get_json(force=True)
     run_user = re.sub(r"[^a-zA-Z0-9_\-]", "", data.get("run_user", "www-data"))
 
+    # Couvre /bin/systemctl (symlink) ET /usr/bin/systemctl (chemin réel Debian)
+    sc = SYSTEMCTL  # chemin détecté sur ce système
     sudoers_lines = [
         f"# VPS Admin Panel — règles auto-générées le {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-        f"{run_user} ALL=(ALL) NOPASSWD: /bin/systemctl start *",
-        f"{run_user} ALL=(ALL) NOPASSWD: /bin/systemctl stop *",
-        f"{run_user} ALL=(ALL) NOPASSWD: /bin/systemctl restart *",
-        f"{run_user} ALL=(ALL) NOPASSWD: /bin/systemctl enable *",
-        f"{run_user} ALL=(ALL) NOPASSWD: /bin/systemctl disable *",
-        f"{run_user} ALL=(ALL) NOPASSWD: /bin/systemctl daemon-reload",
-        f"{run_user} ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx",
+        f"{run_user} ALL=(ALL) NOPASSWD: {sc} start *",
+        f"{run_user} ALL=(ALL) NOPASSWD: {sc} stop *",
+        f"{run_user} ALL=(ALL) NOPASSWD: {sc} restart *",
+        f"{run_user} ALL=(ALL) NOPASSWD: {sc} enable *",
+        f"{run_user} ALL=(ALL) NOPASSWD: {sc} disable *",
+        f"{run_user} ALL=(ALL) NOPASSWD: {sc} daemon-reload",
+        f"{run_user} ALL=(ALL) NOPASSWD: {sc} reload nginx",
         f"{run_user} ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t",
+        f"{run_user} ALL=(ALL) NOPASSWD: /bin/nginx -t",
         f"{run_user} ALL=(ALL) NOPASSWD: /bin/mkdir -p /etc/nginx/*",
         f"{run_user} ALL=(ALL) NOPASSWD: /bin/mkdir -p /opt/*",
     ]
