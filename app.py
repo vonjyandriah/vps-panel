@@ -99,9 +99,13 @@ def get_uptime() -> str:
         return "N/A"
 
 
-def run_cmd(cmd: list[str], check: bool = False) -> tuple[int, str, str]:
+def run_cmd(cmd: list[str], check: bool = False, timeout: int = 15) -> tuple[int, str, str]:
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        env = os.environ.copy()
+        # Forcer sortie texte brute — pas de couleurs ANSI, pas de pager
+        env.update({"SYSTEMD_COLORS": "0", "PAGER": "cat", "TERM": "dumb",
+                    "GIT_TERMINAL_PROMPT": "0"})
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
         return r.returncode, r.stdout.strip(), r.stderr.strip()
     except subprocess.TimeoutExpired:
         return 1, "", "Timeout"
@@ -254,10 +258,14 @@ def list_services():
     services = []
     if rc == 0:
         for line in out.splitlines():
+            # Supprimer tout caractère non-ASCII en début de ligne (●, codes ANSI…)
+            line = re.sub(r'^[\s\W]+', '', line)
             parts = line.split(None, 4)
-            # Debian préfixe les unités failed/dead avec "●" — décaler si besoin
-            if parts and parts[0] == "●":
-                parts = parts[1:]
+            if not parts:
+                continue
+            # Si le premier token ne ressemble pas à un nom de service, le sauter
+            if ".service" not in parts[0] and "@" not in parts[0]:
+                continue
             if len(parts) >= 4:
                 name = parts[0].replace(".service", "")
                 load, active, sub = parts[1], parts[2], parts[3]
@@ -737,10 +745,11 @@ def parse_service_file(path: Path) -> dict | None:
 
     port, workers, wsgi_module = None, 3, "wsgi:app"
     if exec_start:
-        m = re.search(r"--bind\s+\S+:(\d+)", exec_start)
+        # Formats : --bind 0.0.0.0:8000  --bind=127.0.0.1:8000  -b :8000
+        m = re.search(r"(?:--bind|-b)[=\s]+\S*:(\d+)", exec_start)
         if m:
             port = int(m.group(1))
-        m = re.search(r"--workers\s+(\d+)", exec_start)
+        m = re.search(r"--workers[=\s]+(\d+)", exec_start)
         if m:
             workers = int(m.group(1))
         parts = exec_start.strip().split()
