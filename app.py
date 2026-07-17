@@ -723,13 +723,24 @@ def get_domain_details(conf_file: Path) -> dict:
         apps = [f.stem for f in include_dir.glob("*.conf")]
 
     # Routes détectées directement dans le config nginx (location + proxy_pass)
-    # Couvre les apps existantes qui ne passent pas par le panel
+    # Couvre les apps existantes qui ne passent pas par le panel.
+    # On compte les accolades pour gérer les blocs imbriqués (if, try_files, etc.)
     routes = []
-    for block in re.finditer(
-        r"location\s+([^\s{]+)\s*\{[^}]*proxy_pass\s+http[s]?://[^:]+:(\d+)[^}]*\}",
-        content, re.DOTALL
-    ):
-        routes.append({"path": block.group(1), "port": int(block.group(2))})
+    proxy_re = re.compile(r"proxy_pass\s+https?://[^:]+:(\d+)", re.MULTILINE)
+    for loc_match in re.finditer(r"location\s+([^\s{]+)\s*\{", content, re.MULTILINE):
+        path = loc_match.group(1)
+        start = loc_match.end()
+        depth, pos = 1, start
+        while pos < len(content) and depth > 0:
+            if content[pos] == '{':
+                depth += 1
+            elif content[pos] == '}':
+                depth -= 1
+            pos += 1
+        block_content = content[start:pos - 1]
+        pp = proxy_re.search(block_content)
+        if pp:
+            routes.append({"path": path, "port": int(pp.group(1))})
 
     # Check if enabled (symlink in sites-enabled)
     sites_enabled = Path("/etc/nginx/sites-enabled")
