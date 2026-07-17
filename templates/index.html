@@ -526,7 +526,7 @@
               class="w-full flex items-center justify-between bg-panel-bg border rounded-lg px-3 py-2.5 text-sm font-mono transition-colors"
               :class="domainOpen ? 'border-panel-accent' : 'border-panel-border'">
               <span :class="deployForm.domain ? 'text-panel-accent' : 'text-panel-muted'"
-                x-text="deployForm.domain || 'Sélectionner un domaine…'"></span>
+                x-text="deployForm.domainDisplay || deployForm.domain || 'Sélectionner un domaine…'"></span>
               <svg class="w-4 h-4 text-panel-muted transition-transform" :class="domainOpen && 'rotate-180'"
                 fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path d="M19 9l-7 7-7-7"/>
@@ -542,7 +542,7 @@
 
               <!-- Domains list -->
               <template x-for="d in nginxDomains" :key="d.name">
-                <button type="button" @click="deployForm.domain=d.name; domainOpen=false"
+                <button type="button" @click="deployForm.domain=d.name; deployForm.domainDisplay=d.server_name||d.name; domainOpen=false"
                   class="w-full flex items-center justify-between px-4 py-3 hover:bg-panel-bg transition-colors border-b border-panel-border/50 last:border-0"
                   :class="deployForm.domain===d.name ? 'bg-panel-accent/10' : ''">
                   <div class="flex items-center gap-3 min-w-0">
@@ -551,7 +551,7 @@
                     <div class="text-left min-w-0">
                       <div class="text-sm font-mono truncate"
                         :class="deployForm.domain===d.name ? 'text-panel-accent' : 'text-panel-text'"
-                        x-text="d.name"></div>
+                        x-text="d.server_name || d.name"></div>
                       <div class="text-xs text-panel-muted mt-0.5" x-show="d.apps && d.apps.length">
                         <span x-text="d.apps.length + ' app(s): ' + d.apps.join(', ')"></span>
                       </div>
@@ -762,7 +762,7 @@
                 <div class="flex items-center gap-2 flex-wrap mb-3">
                   <span class="w-2.5 h-2.5 rounded-full flex-shrink-0"
                     :class="d.enabled ? 'bg-panel-green' : 'bg-panel-muted'"></span>
-                  <h3 class="font-mono text-base font-semibold text-panel-accent" x-text="d.name"></h3>
+                  <h3 class="font-mono text-base font-semibold text-panel-accent" x-text="d.server_name || d.name"></h3>
                   <span x-show="d.ssl"
                     class="px-1.5 py-0.5 rounded text-xs bg-green-900/20 text-panel-green border border-green-900/30">🔒 SSL</span>
                   <span x-show="!d.enabled"
@@ -792,7 +792,7 @@
 
               <!-- Actions -->
               <div class="flex flex-col gap-2 flex-shrink-0">
-                <button @click="deployForm.domain=d.name; activeTab='deploy'; loadPorts()"
+                <button @click="deployForm.domain=d.name; deployForm.domainDisplay=d.server_name||d.name; activeTab='deploy'; loadPorts()"
                   class="flex items-center gap-1.5 px-3 py-1.5 bg-panel-accent/10 border border-panel-accent/40 text-panel-accent hover:bg-panel-accent/20 rounded-lg text-xs transition-colors whitespace-nowrap">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path d="M12 5v14M5 12l7-7 7 7"/>
@@ -1142,6 +1142,7 @@ function panelApp() {
       parent_path: '/opt',
       app_name: '',
       domain: '',
+      domainDisplay: '',
       routing_type: 'subfolder',
       port: 8100,
       workers: 3,

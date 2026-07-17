@@ -704,7 +704,19 @@ def get_domain_details(conf_file: Path) -> dict:
 
     ssl = "ssl_certificate" in content or "listen 443" in content
 
-    # Detect apps from include patterns: /etc/nginx/<domain>-apps/*.conf
+    # Extraire le vrai nom de domaine depuis la directive server_name
+    # Le fichier peut s'appeler "support_i_tracker" mais contenir "server_name support.i-tracker.online"
+    server_name = name  # fallback = nom de fichier
+    m = re.search(r"^\s*server_name\s+([^;]+);", content, re.MULTILINE)
+    if m:
+        # Prendre le premier nom (ignorer les alias www. etc.)
+        candidates = m.group(1).strip().split()
+        # Préférer le nom le plus long (le plus spécifique) qui n'est pas "_"
+        candidates = [c for c in candidates if c != "_"]
+        if candidates:
+            server_name = max(candidates, key=len)
+
+    # Detect apps from include patterns: /etc/nginx/<name>-apps/*.conf
     include_dir = Path(f"/etc/nginx/{name}-apps")
     apps = []
     if include_dir.exists():
@@ -715,7 +727,8 @@ def get_domain_details(conf_file: Path) -> dict:
     enabled = (sites_enabled / name).exists() if sites_enabled.exists() else True
 
     return {
-        "name": name,
+        "name": name,           # nom du fichier — utilisé pour les chemins internes
+        "server_name": server_name,  # vrai domaine extrait du server_name nginx
         "conf_path": str(conf_file),
         "enabled": enabled,
         "apps": apps,
