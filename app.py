@@ -25,6 +25,10 @@ PANEL_USERNAME = os.environ.get("PANEL_USERNAME", "admin")
 PANEL_PASSWORD = os.environ.get("PANEL_PASSWORD", "admin")
 PANEL_BASE_PATH = os.environ.get("PANEL_BASE_PATH", "")  # ex: "/panel_admin"
 
+# Chemin absolu de systemctl — nécessaire quand le panel tourne en service systemd
+# (le PATH du service ne contient pas /bin ni /usr/bin)
+SYSTEMCTL = shutil.which("systemctl") or "/bin/systemctl"
+
 
 # ─────────────────────────────────────────────────────────
 #  AUTH
@@ -105,6 +109,13 @@ def run_cmd(cmd: list[str], check: bool = False, timeout: int = 15) -> tuple[int
         # Forcer sortie texte brute — pas de couleurs ANSI, pas de pager
         env.update({"SYSTEMD_COLORS": "0", "PAGER": "cat", "TERM": "dumb",
                     "GIT_TERMINAL_PROMPT": "0"})
+        # S'assurer que /bin et /usr/bin sont dans le PATH (absent quand on tourne
+        # en service systemd avec un PATH restreint)
+        paths = env.get("PATH", "").split(":")
+        for p in ["/bin", "/usr/bin", "/sbin", "/usr/sbin"]:
+            if p not in paths:
+                paths.append(p)
+        env["PATH"] = ":".join(paths)
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
         return r.returncode, r.stdout.strip(), r.stderr.strip()
     except subprocess.TimeoutExpired:
@@ -253,7 +264,7 @@ def debug_info():
     results = {}
 
     # systemctl list-units brut
-    rc, out, err = run_cmd(["systemctl", "list-units", "--type=service",
+    rc, out, err = run_cmd([SYSTEMCTL, "list-units", "--type=service",
                              "--all", "--no-pager", "--no-legend"])
     results["systemctl_list_units"] = {
         "rc": rc, "stdout": out[:3000], "stderr": err[:500],
@@ -261,7 +272,7 @@ def debug_info():
     }
 
     # systemctl version
-    rc2, out2, _ = run_cmd(["systemctl", "--version"])
+    rc2, out2, _ = run_cmd([SYSTEMCTL, "--version"])
     results["systemctl_version"] = out2.splitlines()[0] if out2 else "N/A"
 
     # Exemple d'une ligne brute (repr pour voir les caractères cachés)
@@ -269,7 +280,7 @@ def debug_info():
     results["first_lines_repr"] = [repr(l) for l in first_lines]
 
     # Chemin de systemctl
-    results["systemctl_path"] = shutil.which("systemctl") or "introuvable"
+    results["systemctl_path"] = SYSTEMCTL
 
     # Fichiers .service dans systemd
     svc_files = list(SYSTEMD_DIR.glob("*.service")) if IS_VPS else []
@@ -294,7 +305,7 @@ def list_services():
         return jsonify({"services": DEMO_SERVICES, "demo": True})
 
     rc, out, err = run_cmd([
-        "systemctl", "list-units", "--type=service", "--all",
+        SYSTEMCTL, "list-units", "--type=service", "--all",
         "--no-pager", "--no-legend"
     ])
 
@@ -315,7 +326,7 @@ def list_services():
                 desc = parts[4] if len(parts) > 4 else ""
 
                 # Récupérer ActiveEnterTimestamp
-                _, ts_out, _ = run_cmd(["systemctl", "show", f"{name}.service",
+                _, ts_out, _ = run_cmd([SYSTEMCTL, "show", f"{name}.service",
                                         "--property=ActiveEnterTimestamp", "--value"])
                 services.append({
                     "name": name,
@@ -346,7 +357,7 @@ def service_action(name: str, action: str):
             "demo": True,
         })
 
-    rc, out, err = run_cmd(["systemctl", action, f"{name}.service"])
+    rc, out, err = run_cmd([SYSTEMCTL, action, f"{name}.service"])
     return jsonify({
         "success": rc == 0,
         "message": out or err or f"Action {action} exécutée",
@@ -403,7 +414,7 @@ def service_status(name: str):
                             "sub_status": svc["sub_status"], "demo": True})
         return jsonify({"success": False, "error": "Service non trouvé"}), 404
 
-    rc, out, err = run_cmd(["systemctl", "show", f"{name}.service",
+    rc, out, err = run_cmd([SYSTEMCTL, "show", f"{name}.service",
                             "--property=ActiveState,SubState", "--value"])
     parts = out.splitlines()
     return jsonify({
@@ -624,18 +635,18 @@ def deploy():
         return jsonify({"success": False, "steps": steps})
 
     # Étape 5 : daemon-reload
-    rc, out, err = run_cmd(["systemctl", "daemon-reload"])
+    rc, out, err = run_cmd([SYSTEMCTL, "daemon-reload"])
     steps.append({"step": "systemctl daemon-reload", "ok": rc == 0, "detail": out or err or "OK"})
 
     # Étape 6 : enable + démarrage
-    rc, out, err = run_cmd(["systemctl", "enable", "--now", f"{app_name}.service"])
+    rc, out, err = run_cmd([SYSTEMCTL, "enable", "--now", f"{app_name}.service"])
     steps.append({"step": f"systemctl enable --now {app_name}", "ok": rc == 0,
                    "detail": out or err or "Service activé et démarré"})
 
     # Étape 7 : Test + reload Nginx
     rc_test, out_test, err_test = run_cmd(["nginx", "-t"])
     if rc_test == 0:
-        rc_reload, out_reload, err_reload = run_cmd(["systemctl", "reload", "nginx"])
+        rc_reload, out_reload, err_reload = run_cmd([SYSTEMCTL, "reload", "nginx"])
         steps.append({"step": "nginx -t && systemctl reload nginx", "ok": rc_reload == 0,
                        "detail": out_reload or err_reload or "nginx rechargé"})
     else:
@@ -743,7 +754,7 @@ def nginx_reload():
     rc_test, _, err_test = run_cmd(["nginx", "-t"])
     if rc_test != 0:
         return jsonify({"success": False, "message": f"Config invalide : {err_test}"})
-    rc, out, err = run_cmd(["systemctl", "reload", "nginx"])
+    rc, out, err = run_cmd([SYSTEMCTL, "reload", "nginx"])
     return jsonify({"success": rc == 0, "message": out or err or "nginx rechargé", "demo": False})
 
 
@@ -855,8 +866,8 @@ def normalize_app(name: str):
         if service_path.exists():
             service_path.with_suffix(".service.bak").write_text(service_path.read_text())
         service_path.write_text(service_content)
-        run_cmd(["systemctl", "daemon-reload"])
-        rc, out, err = run_cmd(["systemctl", "restart", f"{name}.service"])
+        run_cmd([SYSTEMCTL, "daemon-reload"])
+        rc, out, err = run_cmd([SYSTEMCTL, "restart", f"{name}.service"])
         return jsonify({
             "success": rc == 0,
             "demo": False,
