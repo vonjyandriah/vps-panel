@@ -777,17 +777,27 @@
                   <span class="text-xs font-mono text-panel-muted" x-text="d.conf_path"></span>
                 </div>
 
-                <!-- Apps déployées sur ce domaine -->
-                <div x-show="d.apps && d.apps.length > 0">
-                  <p class="text-xs text-panel-muted mb-1.5">Applications déployées :</p>
+                <!-- Apps déployées via le panel -->
+                <div x-show="d.apps && d.apps.length > 0" class="mb-2">
+                  <p class="text-xs text-panel-muted mb-1.5">Déployées via le panel :</p>
                   <div class="flex flex-wrap gap-1.5">
                     <template x-for="app in d.apps" :key="app">
-                      <span class="px-2 py-0.5 rounded-full text-xs font-mono bg-panel-bg border border-panel-border text-panel-text" x-text="app"></span>
+                      <span class="px-2 py-0.5 rounded-full text-xs font-mono bg-panel-accent/10 border border-panel-accent/30 text-panel-accent" x-text="app"></span>
                     </template>
                   </div>
                 </div>
-                <div x-show="!d.apps || d.apps.length === 0"
-                  class="text-xs text-panel-muted italic">Aucune application panel déployée sur ce domaine</div>
+                <!-- Routes proxy_pass détectées dans le fichier nginx -->
+                <div x-show="d.routes && d.routes.length > 0">
+                  <p class="text-xs text-panel-muted mb-1.5">Routes nginx détectées :</p>
+                  <div class="flex flex-wrap gap-1.5">
+                    <template x-for="r in d.routes" :key="r.path">
+                      <span class="px-2 py-0.5 rounded-full text-xs font-mono bg-panel-bg border border-panel-border text-panel-text"
+                        x-text="r.path + ' → :' + r.port"></span>
+                    </template>
+                  </div>
+                </div>
+                <div x-show="(!d.apps || d.apps.length === 0) && (!d.routes || d.routes.length === 0)"
+                  class="text-xs text-panel-muted italic">Aucune route proxy détectée sur ce domaine</div>
               </div>
 
               <!-- Actions -->

@@ -716,22 +716,32 @@ def get_domain_details(conf_file: Path) -> dict:
         if candidates:
             server_name = max(candidates, key=len)
 
-    # Detect apps from include patterns: /etc/nginx/<name>-apps/*.conf
+    # Apps déployées via le panel (include files)
     include_dir = Path(f"/etc/nginx/{name}-apps")
     apps = []
     if include_dir.exists():
         apps = [f.stem for f in include_dir.glob("*.conf")]
+
+    # Routes détectées directement dans le config nginx (location + proxy_pass)
+    # Couvre les apps existantes qui ne passent pas par le panel
+    routes = []
+    for block in re.finditer(
+        r"location\s+([^\s{]+)\s*\{[^}]*proxy_pass\s+http[s]?://[^:]+:(\d+)[^}]*\}",
+        content, re.DOTALL
+    ):
+        routes.append({"path": block.group(1), "port": int(block.group(2))})
 
     # Check if enabled (symlink in sites-enabled)
     sites_enabled = Path("/etc/nginx/sites-enabled")
     enabled = (sites_enabled / name).exists() if sites_enabled.exists() else True
 
     return {
-        "name": name,           # nom du fichier — utilisé pour les chemins internes
+        "name": name,                # nom du fichier — utilisé pour les chemins internes
         "server_name": server_name,  # vrai domaine extrait du server_name nginx
         "conf_path": str(conf_file),
         "enabled": enabled,
         "apps": apps,
+        "routes": routes,            # routes proxy_pass détectées dans le fichier nginx
         "ssl": ssl,
     }
 
