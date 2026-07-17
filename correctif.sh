@@ -52,8 +52,11 @@ NGINX_SNIPPET="/etc/nginx/snippets/vps-panel.conf"
 
 cat > "$NGINX_SNIPPET" << EOF
 # VPS Admin Panel
-location ${BASE_PATH} {
-    proxy_pass         http://127.0.0.1:${PORT};
+location = ${BASE_PATH} {
+    return 301 ${BASE_PATH}/;
+}
+location ${BASE_PATH}/ {
+    proxy_pass         http://127.0.0.1:${PORT}/;
     proxy_set_header   Host               \$host;
     proxy_set_header   X-Real-IP          \$remote_addr;
     proxy_set_header   X-Forwarded-For    \$proxy_add_x_forwarded_for;
