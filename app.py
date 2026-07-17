@@ -255,6 +255,9 @@ def list_services():
     if rc == 0:
         for line in out.splitlines():
             parts = line.split(None, 4)
+            # Debian préfixe les unités failed/dead avec "●" — décaler si besoin
+            if parts and parts[0] == "●":
+                parts = parts[1:]
             if len(parts) >= 4:
                 name = parts[0].replace(".service", "")
                 load, active, sub = parts[1], parts[2], parts[3]
@@ -744,7 +747,8 @@ def parse_service_file(path: Path) -> dict | None:
         if parts and not parts[-1].startswith("-"):
             wsgi_module = parts[-1]
 
-    is_standard = "FLASK_SECRET_KEY" in content and "Service Automatise" in content
+    is_standard = ("Service Automatise" in content or "EnvironmentFile" in content) and \
+                  ("gunicorn" in content)
 
     return {
         "name": name,
@@ -764,8 +768,11 @@ def scan_apps():
     if not IS_VPS:
         return jsonify({"apps": DEMO_SCAN_APPS, "demo": True})
 
+    EXCLUDED = {"vps-panel"}
     apps = []
     for svc_file in SYSTEMD_DIR.glob("*.service"):
+        if svc_file.stem in EXCLUDED:
+            continue
         parsed = parse_service_file(svc_file)
         if parsed:
             apps.append(parsed)
