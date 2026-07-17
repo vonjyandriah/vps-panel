@@ -25,9 +25,10 @@ PANEL_USERNAME = os.environ.get("PANEL_USERNAME", "admin")
 PANEL_PASSWORD = os.environ.get("PANEL_PASSWORD", "admin")
 PANEL_BASE_PATH = os.environ.get("PANEL_BASE_PATH", "")  # ex: "/panel_admin"
 
-# Chemin absolu de systemctl — nécessaire quand le panel tourne en service systemd
+# Chemins absolus — nécessaires quand le panel tourne en service systemd
 # (le PATH du service ne contient pas /bin ni /usr/bin)
-SYSTEMCTL = shutil.which("systemctl") or "/bin/systemctl"
+SYSTEMCTL   = shutil.which("systemctl")   or "/bin/systemctl"
+JOURNALCTL  = shutil.which("journalctl")  or "/bin/journalctl"
 
 
 # ─────────────────────────────────────────────────────────
@@ -391,9 +392,9 @@ def service_logs(name: str):
         return jsonify({"success": True, "logs": demo_logs, "demo": True})
 
     rc, out, err = run_cmd([
-        "journalctl", "-u", f"{name}.service",
+        JOURNALCTL, "-u", f"{name}.service",
         "-n", str(lines), "--no-pager", "--output=short"
-    ])
+    ], timeout=30)
     return jsonify({
         "success": rc == 0,
         "logs": out if rc == 0 else err,
@@ -778,6 +779,29 @@ DEMO_SCAN_APPS = [
 ]
 
 
+def get_service_port_from_pid(name: str) -> int | None:
+    """Détecte le port d'écoute d'un service via son PID (fallback quand le fichier .service n'indique pas le port)."""
+    try:
+        rc, out, _ = run_cmd([SYSTEMCTL, "show", f"{name}.service",
+                               "--property=MainPID", "--value"])
+        pid = int(out.strip())
+        if pid <= 0:
+            return None
+        proc = psutil.Process(pid)
+        # Chercher dans le process et ses enfants (workers gunicorn)
+        procs = [proc] + proc.children(recursive=True)
+        for p in procs:
+            try:
+                for conn in p.net_connections(kind="inet"):
+                    if conn.status == "LISTEN" and conn.laddr.port > 0:
+                        return conn.laddr.port
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+    except Exception:
+        pass
+    return None
+
+
 def parse_service_file(path: Path) -> dict | None:
     """Parse a systemd .service file and return info if gunicorn-based."""
     try:
@@ -838,6 +862,10 @@ def scan_apps():
             continue
         parsed = parse_service_file(svc_file)
         if parsed:
+            # Si le port n'est pas détecté dans le fichier .service,
+            # tenter de le lire depuis le PID du process en cours
+            if parsed["port"] is None:
+                parsed["port"] = get_service_port_from_pid(parsed["name"])
             apps.append(parsed)
 
     return jsonify({"apps": sorted(apps, key=lambda x: x["name"]), "demo": False})
