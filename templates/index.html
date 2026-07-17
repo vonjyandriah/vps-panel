@@ -1026,32 +1026,34 @@
 
         <div x-show="gitRepos.length > 0" class="space-y-2">
           <template x-for="repo in gitRepos" :key="repo.path">
-            <div class="bg-panel-bg border border-panel-border rounded-lg px-4 py-3 flex items-center gap-4">
-              <!-- Info repo -->
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 mb-0.5">
-                  <span class="font-mono text-sm text-panel-accent font-medium" x-text="repo.name"></span>
-                  <span class="px-1.5 py-0.5 rounded text-xs bg-panel-surface border border-panel-border text-panel-green font-mono"
-                    x-text="'⎇ ' + repo.branch"></span>
+            <div>
+              <div class="bg-panel-bg border border-panel-border rounded-lg px-4 py-3 flex items-center gap-4">
+                <!-- Info repo -->
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-0.5">
+                    <span class="font-mono text-sm text-panel-accent font-medium" x-text="repo.name"></span>
+                    <span class="px-1.5 py-0.5 rounded text-xs bg-panel-surface border border-panel-border text-panel-green font-mono"
+                      x-text="'⎇ ' + repo.branch"></span>
+                  </div>
+                  <div class="text-xs text-panel-muted font-mono truncate" x-text="repo.path"></div>
+                  <div class="text-xs text-panel-muted mt-0.5 truncate" x-text="repo.last_commit"></div>
                 </div>
-                <div class="text-xs text-panel-muted font-mono truncate" x-text="repo.path"></div>
-                <div class="text-xs text-panel-muted mt-0.5 truncate" x-text="repo.last_commit"></div>
+                <!-- Bouton pull -->
+                <button @click="doGitPull(repo.path)"
+                  :disabled="gitPullLoading === repo.path"
+                  class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-panel-bg border border-panel-green text-panel-green hover:bg-green-900/20 rounded-lg text-xs transition-colors disabled:opacity-50">
+                  <svg :class="gitPullLoading === repo.path && 'animate-spin'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                  </svg>
+                  <span x-text="gitPullLoading === repo.path ? 'Pull…' : '↓ Pull'"></span>
+                </button>
               </div>
-              <!-- Bouton pull -->
-              <button @click="doGitPull(repo.path)"
-                :disabled="gitPullLoading === repo.path"
-                class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-panel-bg border border-panel-green text-panel-green hover:bg-green-900/20 rounded-lg text-xs transition-colors disabled:opacity-50">
-                <svg :class="gitPullLoading === repo.path && 'animate-spin'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                </svg>
-                <span x-text="gitPullLoading === repo.path ? 'Pull…' : '↓ Pull'"></span>
-              </button>
-            </div>
-            <!-- Output pull par repo -->
-            <div x-show="gitPullOutputs[repo.path]" x-cloak class="fade-in ml-2">
-              <pre class="log-console p-3 rounded text-xs overflow-x-auto"
-                :class="gitPullResults[repo.path] ? 'text-panel-green' : 'text-panel-red'"
-                x-text="gitPullOutputs[repo.path]"></pre>
+              <!-- Output pull par repo -->
+              <div x-show="gitPullOutputs[repo.path]" x-cloak class="fade-in ml-2 mt-1">
+                <pre class="log-console p-3 rounded text-xs overflow-x-auto"
+                  :class="gitPullResults[repo.path] ? 'text-panel-green' : 'text-panel-red'"
+                  x-text="gitPullOutputs[repo.path]"></pre>
+              </div>
             </div>
           </template>
         </div>
