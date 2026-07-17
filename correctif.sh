@@ -47,7 +47,8 @@ PORT="${PORT:-9999}"
 
 # ── 2. Générer le snippet Nginx corrigé ───────────────────
 echo -e "\n${BOLD}[2/4] Snippet Nginx${RESET}"
-NGINX_SNIPPET="/etc/nginx/conf.d/vps-panel.conf"
+mkdir -p /etc/nginx/snippets
+NGINX_SNIPPET="/etc/nginx/snippets/vps-panel.conf"
 
 cat > "$NGINX_SNIPPET" << EOF
 # VPS Admin Panel
