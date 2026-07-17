@@ -241,6 +241,49 @@ def system_stats():
 
 
 # ─────────────────────────────────────────────────────────
+#  API — DEBUG (voir output brut des commandes système)
+# ─────────────────────────────────────────────────────────
+
+@app.route("/api/debug")
+@login_required
+def debug_info():
+    """Retourne l'output brut des commandes clés pour diagnostiquer."""
+    import shutil
+
+    results = {}
+
+    # systemctl list-units brut
+    rc, out, err = run_cmd(["systemctl", "list-units", "--type=service",
+                             "--all", "--no-pager", "--no-legend"])
+    results["systemctl_list_units"] = {
+        "rc": rc, "stdout": out[:3000], "stderr": err[:500],
+        "lines": out.splitlines()[:20]  # 20 premières lignes
+    }
+
+    # systemctl version
+    rc2, out2, _ = run_cmd(["systemctl", "--version"])
+    results["systemctl_version"] = out2.splitlines()[0] if out2 else "N/A"
+
+    # Exemple d'une ligne brute (repr pour voir les caractères cachés)
+    first_lines = out.splitlines()[:5]
+    results["first_lines_repr"] = [repr(l) for l in first_lines]
+
+    # Chemin de systemctl
+    results["systemctl_path"] = shutil.which("systemctl") or "introuvable"
+
+    # Fichiers .service dans systemd
+    svc_files = list(SYSTEMD_DIR.glob("*.service")) if IS_VPS else []
+    results["service_files"] = [f.name for f in svc_files[:20]]
+
+    # IS_VPS
+    results["is_vps"] = IS_VPS
+    results["systemd_dir"] = str(SYSTEMD_DIR)
+    results["systemd_dir_exists"] = SYSTEMD_DIR.exists()
+
+    return jsonify(results)
+
+
+# ─────────────────────────────────────────────────────────
 #  API — SERVICES SYSTEMD
 # ─────────────────────────────────────────────────────────
 
