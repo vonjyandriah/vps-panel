@@ -792,12 +792,12 @@
                   <div class="flex flex-wrap gap-1.5">
                     <template x-for="r in d.routes" :key="r.path">
                       <span class="px-2 py-0.5 rounded-full text-xs font-mono bg-panel-bg border border-panel-border text-panel-text"
-                        x-text="r.path + ' → :' + r.port"></span>
+                        x-text="r.type === 'socket' ? r.path + ' → socket' : r.type === 'upstream' ? r.path + ' → ' + r.upstream + (r.port ? ' (:' + r.port + ')' : '') : r.path + ' → :' + r.port"></span>
                     </template>
                   </div>
                 </div>
                 <div x-show="(!d.apps || d.apps.length === 0) && (!d.routes || d.routes.length === 0)"
-                  class="text-xs text-panel-muted italic">Aucune route proxy détectée sur ce domaine</div>
+                  class="text-xs text-panel-muted italic">Aucune route proxy détectée — <button class="underline" @click="viewNginxConfig(d.name)">voir le fichier config</button></div>
               </div>
 
               <!-- Actions -->
@@ -1165,6 +1165,7 @@ function panelApp() {
     // Domaines
     nginxDomains: [],
     domainsLoading: false,
+    nginxConfigModal: { open: false, name: '', path: '', content: '' },
     nginxTesting: false,
     nginxReloading: false,
     nginxTestOutput: '',
@@ -1340,6 +1341,21 @@ function panelApp() {
         this.showToast('Erreur chargement domaines', 'error');
       } finally {
         this.domainsLoading = false;
+      }
+    },
+    async viewNginxConfig(name) {
+      this.nginxConfigModal = { open: true, name, path: '', content: 'Chargement…' };
+      try {
+        const r = await fetch(PANEL_BASE + '/api/nginx/domains/' + name + '/config');
+        const data = await r.json();
+        if (data.success) {
+          this.nginxConfigModal.content = data.content;
+          this.nginxConfigModal.path = data.path;
+        } else {
+          this.nginxConfigModal.content = 'Erreur : ' + (data.error || 'inconnue');
+        }
+      } catch (e) {
+        this.nginxConfigModal.content = 'Erreur réseau';
       }
     },
 
@@ -1627,5 +1643,30 @@ WantedBy=multi-user.target`;
   };
 }
 </script>
+
+<!-- Modal : contenu brut du fichier nginx -->
+<div x-data x-show="$store?.panel?.nginxConfigModal?.open || false" style="display:none"
+  x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+  @click.self="$dispatch('close-nginx-modal')">
+</div>
+<template x-if="true">
+  <div x-data="{ get m() { return panel().nginxConfigModal } }"
+    x-show="m.open" style="display:none" x-cloak
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+    <div class="bg-panel-surface border border-panel-border rounded-xl w-full max-w-3xl max-h-[80vh] flex flex-col shadow-2xl">
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 py-3 border-b border-panel-border flex-shrink-0">
+        <div>
+          <p class="text-sm font-semibold text-panel-text" x-text="m.name"></p>
+          <p class="text-xs font-mono text-panel-muted" x-text="m.path"></p>
+        </div>
+        <button @click="m.open=false" class="text-panel-muted hover:text-white transition-colors text-xl leading-none">&times;</button>
+      </div>
+      <!-- Content -->
+      <pre class="overflow-auto flex-1 p-4 text-xs font-mono text-panel-text bg-panel-bg rounded-b-xl whitespace-pre-wrap break-all"
+        x-text="m.content"></pre>
+    </div>
+  </div>
+</template>
 </body>
 </html>

@@ -722,11 +722,20 @@ def get_domain_details(conf_file: Path) -> dict:
     if include_dir.exists():
         apps = [f.stem for f in include_dir.glob("*.conf")]
 
-    # Routes détectées directement dans le config nginx (location + proxy_pass)
-    # Couvre les apps existantes qui ne passent pas par le panel.
-    # On compte les accolades pour gérer les blocs imbriqués (if, try_files, etc.)
+    # Résoudre les blocs upstream nommés : upstream backend { server 127.0.0.1:8000; }
+    upstreams = {}
+    for up_match in re.finditer(r"upstream\s+(\S+)\s*\{([^}]+)\}", content, re.DOTALL):
+        up_name = up_match.group(1)
+        srv = re.search(r"server\s+[^:]+:(\d+)", up_match.group(2))
+        if srv:
+            upstreams[up_name] = int(srv.group(1))
+
+    # Routes détectées dans les blocs location (proxy_pass TCP, socket Unix, upstream nommé)
     routes = []
-    proxy_re = re.compile(r"proxy_pass\s+https?://[^:]+:(\d+)", re.MULTILINE)
+    proxy_tcp_re   = re.compile(r"proxy_pass\s+https?://[^:/\s]+:(\d+)", re.MULTILINE)
+    proxy_named_re = re.compile(r"proxy_pass\s+https?://([a-zA-Z0-9_\-]+)\s*;", re.MULTILINE)
+    proxy_unix_re  = re.compile(r"proxy_pass\s+https?://unix:([^;]+);", re.MULTILINE)
+
     for loc_match in re.finditer(r"location\s+([^\s{]+)\s*\{", content, re.MULTILINE):
         path = loc_match.group(1)
         start = loc_match.end()
@@ -737,10 +746,26 @@ def get_domain_details(conf_file: Path) -> dict:
             elif content[pos] == '}':
                 depth -= 1
             pos += 1
-        block_content = content[start:pos - 1]
-        pp = proxy_re.search(block_content)
+        block = content[start:pos - 1]
+
+        # 1. proxy_pass http://127.0.0.1:PORT
+        pp = proxy_tcp_re.search(block)
         if pp:
-            routes.append({"path": path, "port": int(pp.group(1))})
+            routes.append({"path": path, "port": int(pp.group(1)), "type": "tcp"})
+            continue
+        # 2. proxy_pass http://upstream_name  (résolu via bloc upstream)
+        pn = proxy_named_re.search(block)
+        if pn:
+            up = pn.group(1)
+            port = upstreams.get(up)
+            routes.append({"path": path, "port": port, "type": "upstream",
+                           "upstream": up})
+            continue
+        # 3. proxy_pass http://unix:/path/to/socket
+        pu = proxy_unix_re.search(block)
+        if pu:
+            routes.append({"path": path, "port": None, "type": "socket",
+                           "socket": pu.group(1).strip()})
 
     # Check if enabled (symlink in sites-enabled)
     sites_enabled = Path("/etc/nginx/sites-enabled")
@@ -770,6 +795,22 @@ def nginx_domains():
                 domains.append(get_domain_details(f))
 
     return jsonify({"domains": domains, "demo": False})
+
+
+@app.route("/api/nginx/domains/<name>/config")
+@login_required
+def nginx_domain_config(name: str):
+    """Retourne le contenu brut du fichier nginx d'un domaine."""
+    if not re.match(r"^[a-zA-Z0-9_\-\.]+$", name):
+        return jsonify({"success": False, "error": "Nom invalide"}), 400
+    conf_file = NGINX_SITES_AVAILABLE / name
+    try:
+        content = conf_file.read_text()
+        return jsonify({"success": True, "content": content, "path": str(conf_file)})
+    except FileNotFoundError:
+        return jsonify({"success": False, "error": f"Fichier non trouvé : {conf_file}"}), 404
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route("/api/nginx/test", methods=["POST"])
