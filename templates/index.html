@@ -32,6 +32,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <script>const PANEL_BASE = '{{ panel_base }}';</script>
   <style>
     body { font-family: 'Inter', sans-serif; background: #0d1117; }
     .font-mono { font-family: 'JetBrains Mono', monospace; }
@@ -181,7 +182,7 @@
         </svg>
         <span x-text="sudoersLoading ? 'Application…' : 'Config Sudoers auto'"></span>
       </button>
-      <a href="/logout"
+      <a href="{{ panel_base }}/logout"
         class="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-xs text-panel-muted hover:text-panel-red hover:bg-red-900/10 border border-transparent hover:border-red-900/30 transition-colors">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
@@ -1239,7 +1240,7 @@ function panelApp() {
 
     async fetchStats() {
       try {
-        const r = await fetch('/api/system-stats');
+        const r = await fetch(PANEL_BASE + '/api/system-stats');
         this.stats = await r.json();
         this.lastRefresh = new Date().toLocaleTimeString('fr-FR');
       } catch (e) {
@@ -1250,7 +1251,7 @@ function panelApp() {
     async loadServices() {
       this.servicesLoading = true;
       try {
-        const r = await fetch('/api/services');
+        const r = await fetch(PANEL_BASE + '/api/services');
         const data = await r.json();
         this.services = data.services || [];
         this.serviceStats = {
@@ -1268,7 +1269,7 @@ function panelApp() {
     async serviceAction(name, action) {
       this.actionPending = name;
       try {
-        const r = await fetch(`/api/services/${name}/${action}`, { method: 'POST' });
+        const r = await fetch(PANEL_BASE + `/api/services/${name}/${action}`, { method: 'POST' });
         const data = await r.json();
         if (data.success) {
           this.showToast(`${action} ${name}${data.demo ? ' [DÉMO]' : ''} ✓`, 'success');
@@ -1294,7 +1295,7 @@ function panelApp() {
     async loadLogs(name) {
       this.logsPanel.loading = true;
       try {
-        const r = await fetch(`/api/services/${name}/logs?lines=100`);
+        const r = await fetch(PANEL_BASE + `/api/services/${name}/logs?lines=100`);
         const data = await r.json();
         this.logsPanel.content = data.logs || 'Aucun log disponible';
         this.logsPanel.loading = false;
@@ -1309,7 +1310,7 @@ function panelApp() {
 
     async loadPorts() {
       try {
-        const r = await fetch('/api/ports/scan');
+        const r = await fetch(PANEL_BASE + '/api/ports/scan');
         const data = await r.json();
         this.deployForm.port = data.suggested_port;
         this.showToast(`Port libre suggéré: ${data.suggested_port}`, 'info');
@@ -1321,7 +1322,7 @@ function panelApp() {
     async loadDomains() {
       this.domainsLoading = true;
       try {
-        const r = await fetch('/api/nginx/domains');
+        const r = await fetch(PANEL_BASE + '/api/nginx/domains');
         const data = await r.json();
         this.nginxDomains = data.domains || [];
       } catch (e) {
@@ -1335,7 +1336,7 @@ function panelApp() {
       this.nginxTesting = true;
       this.nginxTestOutput = '';
       try {
-        const r = await fetch('/api/nginx/test', { method: 'POST' });
+        const r = await fetch(PANEL_BASE + '/api/nginx/test', { method: 'POST' });
         const data = await r.json();
         this.nginxTestOk = data.success;
         this.nginxTestOutput = data.output || (data.success ? 'Configuration OK' : 'Erreur de configuration');
@@ -1350,7 +1351,7 @@ function panelApp() {
     async nginxReload() {
       this.nginxReloading = true;
       try {
-        const r = await fetch('/api/nginx/reload', { method: 'POST' });
+        const r = await fetch(PANEL_BASE + '/api/nginx/reload', { method: 'POST' });
         const data = await r.json();
         if (data.success) {
           this.showToast('Nginx rechargé ✓' + (data.demo ? ' [DÉMO]' : ''), 'success');
@@ -1399,7 +1400,7 @@ WantedBy=multi-user.target`;
       this.deployResult = null;
       this.showGeneratedFiles = false;
       try {
-        const r = await fetch('/api/deploy', {
+        const r = await fetch(PANEL_BASE + '/api/deploy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(this.deployForm),
@@ -1424,7 +1425,7 @@ WantedBy=multi-user.target`;
       this.importLoading = true;
       this.importedApps = [];
       try {
-        const r = await fetch('/api/scan/apps');
+        const r = await fetch(PANEL_BASE + '/api/scan/apps');
         const data = await r.json();
         this.importedApps = data.apps || [];
         if (data.demo) this.showToast('Mode Démo — données simulées', 'info');
@@ -1451,7 +1452,7 @@ WantedBy=multi-user.target`;
       this.normalizing = true;
       this.normalizeResult = null;
       try {
-        const r = await fetch(`/api/apps/${this.normalizeTarget.name}/normalize`, {
+        const r = await fetch(PANEL_BASE + `/api/apps/${this.normalizeTarget.name}/normalize`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(this.normalizeForm),
@@ -1482,7 +1483,7 @@ WantedBy=multi-user.target`;
       this.gitCloneLoading = true;
       this.gitCloneOutput = '';
       try {
-        const r = await fetch('/api/git/clone', {
+        const r = await fetch(PANEL_BASE + '/api/git/clone', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(this.gitCloneForm),
@@ -1502,7 +1503,7 @@ WantedBy=multi-user.target`;
     async scanGitRepos() {
       this.gitReposLoading = true;
       try {
-        const r = await fetch(`/api/git/repos?base=${encodeURIComponent(this.gitReposBase)}`);
+        const r = await fetch(PANEL_BASE + `/api/git/repos?base=${encodeURIComponent(this.gitReposBase)}`);
         const data = await r.json();
         this.gitRepos = data.repos || [];
         if (data.demo) this.showToast('Mode Démo — dépôts simulés', 'info');
@@ -1520,7 +1521,7 @@ WantedBy=multi-user.target`;
       this.gitPullLoading = projectPath;
       this.gitPullOutputs = { ...this.gitPullOutputs, [projectPath]: '' };
       try {
-        const r = await fetch('/api/git/pull', {
+        const r = await fetch(PANEL_BASE + '/api/git/pull', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ project_path: projectPath }),
@@ -1558,7 +1559,7 @@ WantedBy=multi-user.target`;
       form.append('target_dir', this.uploadTargetDir);
       for (const f of this.uploadFileList) form.append('files', f);
       try {
-        const r = await fetch('/api/upload', { method: 'POST', body: form });
+        const r = await fetch(PANEL_BASE + '/api/upload', { method: 'POST', body: form });
         const data = await r.json();
         this.uploadResults = data.results || [];
         const ok = data.results?.filter(r => r.ok).length || 0;
@@ -1577,7 +1578,7 @@ WantedBy=multi-user.target`;
     async setupSudoers() {
       this.sudoersLoading = true;
       try {
-        const r = await fetch('/api/setup/sudoers', {
+        const r = await fetch(PANEL_BASE + '/api/setup/sudoers', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ run_user: 'www-data' }),

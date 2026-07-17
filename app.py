@@ -15,12 +15,15 @@ from pathlib import Path
 
 import psutil
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", secrets.token_hex(32))
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 PANEL_USERNAME = os.environ.get("PANEL_USERNAME", "admin")
 PANEL_PASSWORD = os.environ.get("PANEL_PASSWORD", "admin")
+PANEL_BASE_PATH = os.environ.get("PANEL_BASE_PATH", "")  # ex: "/panel_admin"
 
 
 # ─────────────────────────────────────────────────────────
@@ -43,7 +46,7 @@ def login_page():
     if session.get("logged_in"):
         return redirect(url_for("index"))
     error = request.args.get("error")
-    return render_template("login.html", error=error)
+    return render_template("login.html", error=error, panel_base=PANEL_BASE_PATH)
 
 
 @app.route("/login", methods=["POST"])
@@ -150,7 +153,7 @@ DEMO_SERVICES = [
 @login_required
 def index():
     demo_mode = not IS_VPS
-    return render_template("index.html", demo_mode=demo_mode)
+    return render_template("index.html", demo_mode=demo_mode, panel_base=PANEL_BASE_PATH)
 
 
 # ─────────────────────────────────────────────────────────
