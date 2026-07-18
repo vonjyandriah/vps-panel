@@ -32,6 +32,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <!-- xterm.js -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+  <!-- Socket.IO client -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script>const PANEL_BASE = '{{ panel_base }}';</script>
   <style>
     body { font-family: 'Inter', sans-serif; background: #0d1117; }
@@ -163,6 +169,16 @@
           <circle cx="12" cy="12" r="3"/>
         </svg>
         Outils
+      </button>
+
+      <!-- Terminal -->
+      <button @click="activeTab='terminal'; initTerminalTab()" :class="{'active': activeTab==='terminal'}"
+        class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-panel-muted cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <rect x="2" y="3" width="20" height="18" rx="2"/>
+          <path d="M8 9l3 3-3 3M13 15h3"/>
+        </svg>
+        Terminal
       </button>
     </nav>
 
@@ -1112,6 +1128,72 @@
 
     </div>
 
+    <!-- ── TERMINAL ── -->
+    <div x-show="activeTab==='terminal'" x-cloak class="h-screen flex flex-col fade-in" style="height: calc(100vh - 0px);">
+
+      <!-- Header barre -->
+      <div class="flex items-center justify-between px-6 py-3 border-b border-panel-border bg-panel-surface flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <svg class="w-4 h-4 text-panel-green" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 9l3 3-3 3M13 15h3"/>
+          </svg>
+          <span class="text-sm font-semibold text-white">Terminal Web</span>
+          <span x-show="term.connected" class="px-2 py-0.5 text-xs bg-green-900/40 text-panel-green border border-panel-green/30 rounded-full font-mono">connecté</span>
+          <span x-show="!term.connected && !term.needAuth" class="px-2 py-0.5 text-xs bg-red-900/40 text-panel-red border border-panel-red/30 rounded-full font-mono">déconnecté</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <!-- Compteur 15 min -->
+          <div x-show="term.connected || term.remaining > 0" class="flex items-center gap-1.5 text-xs text-panel-muted font-mono">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            <span x-text="'Verrou: ' + Math.floor(term.remaining/60) + 'm' + (term.remaining%60) + 's'"></span>
+          </div>
+          <button x-show="!term.connected && !term.needAuth" @click="termReconnect()"
+            class="px-3 py-1.5 text-xs bg-panel-bg border border-panel-green text-panel-green hover:bg-green-900/20 rounded-lg transition-colors">
+            ↺ Reconnecter
+          </button>
+          <button x-show="term.connected" @click="termDisconnect()"
+            class="px-3 py-1.5 text-xs bg-panel-bg border border-panel-border text-panel-muted hover:text-panel-red rounded-lg transition-colors">
+            ✕ Fermer
+          </button>
+        </div>
+      </div>
+
+      <!-- Zone d'auth (si non authentifié) -->
+      <div x-show="term.needAuth" class="flex-1 flex items-center justify-center">
+        <div class="bg-panel-surface border border-panel-border rounded-xl p-8 w-full max-w-sm shadow-2xl">
+          <div class="flex items-center gap-3 mb-6">
+            <div class="w-10 h-10 rounded-lg bg-yellow-900/30 border border-panel-yellow/40 flex items-center justify-center">
+              <svg class="w-5 h-5 text-panel-yellow" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-white">Accès Terminal</p>
+              <p class="text-xs text-panel-muted">Session valide 15 minutes</p>
+            </div>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs text-panel-muted mb-1.5 uppercase tracking-wider">Mot de passe du panel</label>
+              <input type="password" x-model="term.password"
+                @keydown.enter="termAuth()"
+                class="w-full bg-panel-bg border border-panel-border rounded-lg px-3 py-2.5 text-sm text-panel-text focus:outline-none focus:border-panel-accent transition-colors"
+                placeholder="••••••••" autofocus/>
+            </div>
+            <p x-show="term.authError" class="text-xs text-panel-red" x-text="term.authError"></p>
+            <button @click="termAuth()" :disabled="term.authLoading"
+              class="w-full py-2.5 bg-panel-accent hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+              <span x-text="term.authLoading ? 'Vérification…' : 'Ouvrir le terminal'"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Terminal xterm.js -->
+      <div x-show="!term.needAuth" class="flex-1 min-h-0 bg-black p-1">
+        <div id="xterm-container" class="w-full h-full"></div>
+      </div>
+
+    </div>
+
   </main>
 
   <!-- ── TOAST NOTIFICATIONS ── -->
@@ -1148,6 +1230,12 @@ function panelApp() {
 
     // Logs
     logsPanel: { visible: false, service: '', content: '', loading: false, source: '' },
+
+    // Terminal
+    term: {
+      needAuth: true, connected: false, authLoading: false,
+      password: '', authError: '', remaining: 0,
+    },
 
     // Deploy
     deployForm: {
@@ -1632,6 +1720,59 @@ WantedBy=multi-user.target`;
       }
     },
 
+    // ── TERMINAL ──────────────────────────────────────────
+
+    async initTerminalTab() {
+      // Vérifier si la session terminal est encore valide
+      try {
+        const r = await fetch(PANEL_BASE + '/api/terminal/status');
+        const d = await r.json();
+        this.term.remaining = d.remaining || 0;
+        this.term.needAuth = !d.authenticated;
+        if (d.authenticated) {
+          await this.$nextTick();
+          window._terminalOpen();
+        }
+      } catch (e) {
+        this.term.needAuth = true;
+      }
+    },
+
+    async termAuth() {
+      this.term.authLoading = true;
+      this.term.authError = '';
+      try {
+        const r = await fetch(PANEL_BASE + '/api/terminal/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: this.term.password }),
+        });
+        const d = await r.json();
+        if (d.success) {
+          this.term.needAuth = false;
+          this.term.password = '';
+          this.term.remaining = d.ttl;
+          await this.$nextTick();
+          window._terminalOpen();
+        } else {
+          this.term.authError = d.error || 'Mot de passe incorrect';
+        }
+      } catch (e) {
+        this.term.authError = 'Erreur réseau';
+      } finally {
+        this.term.authLoading = false;
+      }
+    },
+
+    termReconnect() {
+      window._terminalOpen();
+    },
+
+    termDisconnect() {
+      window._terminalClose();
+      this.term.connected = false;
+    },
+
     // ── REFRESH / TOASTS ──────────────────────────────────
 
     async refreshAll() {
@@ -1651,6 +1792,136 @@ WantedBy=multi-user.target`;
     },
   };
 }
+</script>
+
+<!-- ── TERMINAL : xterm.js + Socket.IO (hors Alpine) ── -->
+<script>
+(function () {
+  let _xterm = null, _fitAddon = null, _sock = null, _timerInterval = null;
+  const BASE = '{{ panel_base }}';
+
+  function _getAlpine() {
+    const el = document.querySelector('[x-data]');
+    return el ? el._x_dataStack?.[0] : null;
+  }
+
+  function _setConnected(v) {
+    const a = _getAlpine();
+    if (a) a.term.connected = v;
+  }
+
+  function _startTimer() {
+    clearInterval(_timerInterval);
+    _timerInterval = setInterval(async () => {
+      const a = _getAlpine();
+      if (!a) return;
+      if (a.activeTab !== 'terminal') return;
+      try {
+        const r = await fetch(BASE + '/api/terminal/status');
+        const d = await r.json();
+        a.term.remaining = d.remaining || 0;
+        if (!d.authenticated) {
+          // Session expirée → déconnecter
+          _terminalClose();
+          a.term.needAuth = true;
+          a.term.connected = false;
+        }
+      } catch (_) {}
+    }, 5000);
+  }
+
+  window._terminalOpen = function () {
+    // Créer le terminal xterm si pas encore fait
+    if (!_xterm) {
+      _xterm = new Terminal({
+        cursorBlink: true,
+        fontSize: 14,
+        fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
+        theme: {
+          background: '#000000',
+          foreground: '#e2e8f0',
+          cursor:     '#00ff41',
+          selectionBackground: '#ffffff40',
+          black:   '#1a1a2e', red:     '#ff5555',
+          green:   '#50fa7b', yellow:  '#f1fa8c',
+          blue:    '#bd93f9', magenta: '#ff79c6',
+          cyan:    '#8be9fd', white:   '#f8f8f2',
+        },
+        scrollback: 5000,
+      });
+      _fitAddon = new FitAddon.FitAddon();
+      _xterm.loadAddon(_fitAddon);
+    }
+
+    const container = document.getElementById('xterm-container');
+    if (!container) return;
+
+    // Ouvrir si pas encore ouvert
+    if (!_xterm.element) {
+      _xterm.open(container);
+    }
+
+    // Resize observeur
+    const ro = new ResizeObserver(() => {
+      try { _fitAddon.fit(); } catch (_) {}
+      if (_sock?.connected) {
+        _sock.emit('terminal_resize', { cols: _xterm.cols, rows: _xterm.rows });
+      }
+    });
+    ro.observe(container);
+
+    // Connexion Socket.IO
+    if (_sock) { _sock.disconnect(); }
+    _sock = io(window.location.origin, {
+      path: BASE + '/socket.io',
+      transports: ['websocket', 'polling'],
+    });
+
+    _sock.on('connect', () => {
+      _fitAddon.fit();
+      _sock.emit('terminal_connect', { cols: _xterm.cols, rows: _xterm.rows });
+    });
+
+    _sock.on('terminal_output', ({ data }) => {
+      _xterm.write(data);
+    });
+
+    _sock.on('terminal_closed', () => {
+      _xterm.writeln('\r\n\x1b[33m[Session terminée]\x1b[0m');
+      _setConnected(false);
+    });
+
+    _sock.on('terminal_error', ({ message }) => {
+      _xterm.writeln('\r\n\x1b[31m[Erreur: ' + message + ']\x1b[0m');
+      const a = _getAlpine();
+      if (a && message.includes('expir')) {
+        a.term.needAuth = true;
+        a.term.connected = false;
+      }
+      _setConnected(false);
+    });
+
+    _sock.on('connect_error', () => { _setConnected(false); });
+    _sock.on('disconnect', () => { _setConnected(false); });
+
+    // Input xterm → socket
+    _xterm.onData(data => {
+      if (_sock?.connected) _sock.emit('terminal_input', { data });
+    });
+
+    // Marquer connecté quand terminal_connect est accepté (le shell répond)
+    _xterm.onData(() => { _setConnected(true); });
+    _sock.on('terminal_output', () => { _setConnected(true); });
+
+    _xterm.focus();
+    _startTimer();
+  };
+
+  window._terminalClose = function () {
+    clearInterval(_timerInterval);
+    if (_sock) { _sock.disconnect(); _sock = null; }
+  };
+})();
 </script>
 
 <!-- Modal : contenu brut du fichier nginx (dans le scope x-data="panelApp()") -->

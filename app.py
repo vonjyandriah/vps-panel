@@ -2,24 +2,33 @@
 VPS Admin Panel — Mini-PaaS / cPanel privé
 Flask backend avec monitoring système, gestion systemd et déploiement automatique.
 """
-
+import fcntl
 import os
+import pty
 import re
 import secrets
+import select
 import shutil
 import socket
+import struct
 import subprocess
+import termios
+import threading
 from datetime import datetime, timezone
 from functools import wraps
 from pathlib import Path
 
 import psutil
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+from flask_socketio import SocketIO, disconnect, emit
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", secrets.token_hex(32))
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+socketio = SocketIO(app, async_mode="threading", cors_allowed_origins="*",
+                    logger=False, engineio_logger=False)
 
 PANEL_USERNAME = os.environ.get("PANEL_USERNAME", "admin")
 PANEL_PASSWORD = os.environ.get("PANEL_PASSWORD", "admin")
@@ -1331,7 +1340,141 @@ def setup_sudoers():
 #  POINT D'ENTRÉE
 # ─────────────────────────────────────────────────────────
 
+# ─────────────────────────────────────────────────────────
+#  TERMINAL WEB (PTY + SocketIO)
+# ─────────────────────────────────────────────────────────
+
+TERMINAL_TTL = 15 * 60          # 15 minutes en secondes
+_terminal_sessions: dict = {}   # sid → {pid, fd}
+
+
+def _terminal_auth_ok() -> bool:
+    t = session.get("terminal_auth_time", 0)
+    return (datetime.now().timestamp() - t) < TERMINAL_TTL
+
+
+def _resize_pty(fd: int, cols: int, rows: int) -> None:
+    try:
+        fcntl.ioctl(fd, termios.TIOCSWINSZ,
+                    struct.pack("HHHH", rows, cols, 0, 0))
+    except Exception:
+        pass
+
+
+def _cleanup_terminal(sid: str) -> None:
+    sess = _terminal_sessions.pop(sid, None)
+    if not sess:
+        return
+    try:
+        os.kill(sess["pid"], 9)
+    except ProcessLookupError:
+        pass
+    try:
+        os.close(sess["fd"])
+    except OSError:
+        pass
+
+
+@app.route("/api/terminal/verify", methods=["POST"])
+@login_required
+def terminal_verify():
+    data = request.get_json(force=True) or {}
+    if data.get("password", "") != PANEL_PASSWORD:
+        return jsonify({"success": False, "error": "Mot de passe incorrect"}), 403
+    session["terminal_auth_time"] = datetime.now().timestamp()
+    session.modified = True
+    return jsonify({"success": True, "ttl": TERMINAL_TTL})
+
+
+@app.route("/api/terminal/status")
+@login_required
+def terminal_status():
+    t = session.get("terminal_auth_time", 0)
+    remaining = max(0, TERMINAL_TTL - (datetime.now().timestamp() - t))
+    return jsonify({"authenticated": remaining > 0, "remaining": int(remaining)})
+
+
+# ── SocketIO handlers ──────────────────────────────────
+
+@socketio.on("terminal_connect")
+def on_terminal_connect(data):
+    if not session.get("logged_in"):
+        emit("terminal_error", {"message": "Non authentifié"})
+        disconnect()
+        return
+    if not _terminal_auth_ok():
+        emit("terminal_error", {"message": "Session terminale expirée"})
+        disconnect()
+        return
+
+    sid = request.sid
+    cols = int(data.get("cols", 80))
+    rows = int(data.get("rows", 24))
+
+    pid, fd = pty.fork()
+    if pid == 0:
+        # Processus enfant — shell interactif
+        env = os.environ.copy()
+        env.update({"TERM": "xterm-256color", "COLORTERM": "truecolor",
+                    "LANG": "en_US.UTF-8", "HOME": os.path.expanduser("~")})
+        shell = shutil.which("bash") or "/bin/sh"
+        os.execvpe(shell, [shell, "--login"], env)
+    else:
+        _resize_pty(fd, cols, rows)
+        _terminal_sessions[sid] = {"pid": pid, "fd": fd}
+
+        def _reader():
+            try:
+                while True:
+                    r, _, _ = select.select([fd], [], [], 1.0)
+                    if r:
+                        try:
+                            chunk = os.read(fd, 4096)
+                        except OSError:
+                            break
+                        if chunk:
+                            socketio.emit("terminal_output",
+                                          {"data": chunk.decode("utf-8", errors="replace")},
+                                          to=sid)
+            finally:
+                socketio.emit("terminal_closed", {}, to=sid)
+                _cleanup_terminal(sid)
+
+        threading.Thread(target=_reader, daemon=True).start()
+
+
+@socketio.on("terminal_input")
+def on_terminal_input(data):
+    if not _terminal_auth_ok():
+        emit("terminal_error", {"message": "Session expirée — veuillez vous réauthentifier"})
+        return
+    sess = _terminal_sessions.get(request.sid)
+    if sess:
+        try:
+            os.write(sess["fd"], data["data"].encode("utf-8", errors="replace"))
+        except OSError:
+            _cleanup_terminal(request.sid)
+
+
+@socketio.on("terminal_resize")
+def on_terminal_resize(data):
+    sess = _terminal_sessions.get(request.sid)
+    if sess:
+        _resize_pty(sess["fd"], int(data.get("cols", 80)), int(data.get("rows", 24)))
+
+
+@socketio.on("disconnect")
+def on_ws_disconnect():
+    _cleanup_terminal(request.sid)
+
+
+# ─────────────────────────────────────────────────────────
+#  POINT D'ENTRÉE
+# ─────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_DEBUG", "1") == "1"
-    app.run(host="0.0.0.0", port=port, debug=debug)
+    # use_reloader=False évite le conflit de port quand Flask recharge le module
+    socketio.run(app, host="0.0.0.0", port=port, debug=debug,
+                 use_reloader=False, allow_unsafe_werkzeug=True)
