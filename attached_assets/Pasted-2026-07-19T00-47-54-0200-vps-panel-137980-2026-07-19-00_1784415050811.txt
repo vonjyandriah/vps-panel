@@ -1,0 +1,38 @@
+2026-07-19T00:47:54+0200 vps-panel[137980]: [2026-07-19 00:47:54 +0200] [137980] [INFO] Listening at: http://127.0.0.1:9999 (137980)
+2026-07-19T00:47:54+0200 vps-panel[137980]: [2026-07-19 00:47:54 +0200] [137980] [INFO] Using worker: sync
+2026-07-19T00:47:54+0200 vps-panel[137981]: [2026-07-19 00:47:54 +0200] [137981] [INFO] Booting worker with pid: 137981
+2026-07-19T00:47:55+0200 vps-panel[137982]: [2026-07-19 00:47:55 +0200] [137982] [INFO] Booting worker with pid: 137982
+2026-07-19T00:47:55+0200 vps-panel[137980]: [2026-07-19 00:47:55 +0200] [137980] [INFO] Control socket listening at /root/.gunicorn/gunicorn.ctl
+2026-07-19T00:50:01+0200 vps-panel[137980]: [2026-07-19 00:50:01 +0200] [137980] [INFO] Handling signal: term
+2026-07-19T00:50:01+0200 systemd[1]: Stopping vps-panel.service - VPS Admin Panel...
+2026-07-19T00:50:01+0200 vps-panel[137981]: [2026-07-19 00:50:01 +0200] [137981] [INFO] Worker exiting (pid: 137981)
+2026-07-19T00:50:01+0200 vps-panel[137982]: [2026-07-19 00:50:01 +0200] [137982] [INFO] Worker exiting (pid: 137982)
+2026-07-19T00:50:02+0200 vps-panel[137980]: [2026-07-19 00:50:02 +0200] [137980] [INFO] Worker (pid:137981) was sent SIGTERM!
+2026-07-19T00:50:02+0200 vps-panel[137980]: [2026-07-19 00:50:02 +0200] [137980] [INFO] Worker (pid:137982) was sent SIGTERM!
+2026-07-19T00:50:02+0200 vps-panel[137980]: [2026-07-19 00:50:02 +0200] [137980] [INFO] Shutting down: Master
+2026-07-19T00:50:02+0200 systemd[1]: vps-panel.service: Deactivated successfully.
+2026-07-19T00:50:02+0200 systemd[1]: Stopped vps-panel.service - VPS Admin Panel.
+2026-07-19T00:50:02+0200 systemd[1]: vps-panel.service: Consumed 2.912s CPU time.
+2026-07-19T00:50:02+0200 systemd[1]: Started vps-panel.service - VPS Admin Panel.
+2026-07-19T00:50:02+0200 vps-panel[138124]: [2026-07-19 00:50:02 +0200] [138124] [INFO] Starting gunicorn 26.0.0
+2026-07-19T00:50:02+0200 vps-panel[138124]: [2026-07-19 00:50:02 +0200] [138124] [INFO] Listening at: http://127.0.0.1:9999 (138124)
+2026-07-19T00:50:02+0200 vps-panel[138124]: [2026-07-19 00:50:02 +0200] [138124] [INFO] Using worker: sync
+2026-07-19T00:50:02+0200 vps-panel[138125]: [2026-07-19 00:50:02 +0200] [138125] [INFO] Booting worker with pid: 138125
+2026-07-19T00:50:02+0200 vps-panel[138126]: [2026-07-19 00:50:02 +0200] [138126] [INFO] Booting worker with pid: 138126
+2026-07-19T00:50:02+0200 vps-panel[138124]: [2026-07-19 00:50:02 +0200] [138124] [INFO] Control socket listening at /root/.gunicorn/gunicorn.ctl
+2026-07-19T00:50:16+0200 systemd[1]: Stopping vps-panel.service - VPS Admin Panel...
+2026-07-19T00:50:16+0200 vps-panel[138125]: [2026-07-19 00:50:16 +0200] [138125] [INFO] Worker exiting (pid: 138125)
+2026-07-19T00:50:16+0200 vps-panel[138124]: [2026-07-19 00:50:16 +0200] [138124] [INFO] Handling signal: term
+2026-07-19T00:50:16+0200 vps-panel[138126]: [2026-07-19 00:50:16 +0200] [138126] [INFO] Worker exiting (pid: 138126)
+2026-07-19T00:50:16+0200 vps-panel[138124]: [2026-07-19 00:50:16 +0200] [138124] [INFO] Worker (pid:138125) was sent SIGTERM!
+2026-07-19T00:50:16+0200 vps-panel[138124]: [2026-07-19 00:50:16 +0200] [138124] [INFO] Shutting down: Master
+2026-07-19T00:50:16+0200 systemd[1]: vps-panel.service: Deactivated successfully.
+2026-07-19T00:50:16+0200 systemd[1]: Stopped vps-panel.service - VPS Admin Panel.
+2026-07-19T00:50:16+0200 systemd[1]: vps-panel.service: Consumed 2.775s CPU time.
+2026-07-19T00:50:16+0200 systemd[1]: Started vps-panel.service - VPS Admin Panel.
+2026-07-19T00:50:16+0200 vps-panel[138437]: [2026-07-19 00:50:16 +0200] [138437] [INFO] Starting gunicorn 26.0.0
+2026-07-19T00:50:16+0200 vps-panel[138437]: [2026-07-19 00:50:16 +0200] [138437] [INFO] Listening at: http://127.0.0.1:9999 (138437)
+2026-07-19T00:50:16+0200 vps-panel[138437]: [2026-07-19 00:50:16 +0200] [138437] [INFO] Using worker: sync
+2026-07-19T00:50:16+0200 vps-panel[138438]: [2026-07-19 00:50:16 +0200] [138438] [INFO] Booting worker with pid: 138438
+2026-07-19T00:50:16+0200 vps-panel[138439]: [2026-07-19 00:50:16 +0200] [138439] [INFO] Booting worker with pid: 138439
+2026-07-19T00:50:16+0200 vps-panel[138437]: [2026-07-19 00:50:16 +0200] [138437] [INFO] Control socket listening at /root/.gunicorn/gunicorn.ctl
