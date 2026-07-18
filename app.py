@@ -367,10 +367,31 @@ def service_action(name: str, action: str):
         })
 
     rc, out, err = run_cmd(sudo([SYSTEMCTL, action, f"{name}.service"]), timeout=30)
+
+    # Certains conteneurs LXC retournent rc != 0 même quand l'action réussit.
+    # On vérifie l'état réel du service plutôt que de se fier au code retour.
+    rc2, state, _ = run_cmd([SYSTEMCTL, "is-active", f"{name}.service"], timeout=5)
+    active = state.strip() == "active"
+
+    if action in ("start", "restart"):
+        success = active
+        msg = (out or err or "").strip() or (
+            f"Service {name} actif ✓" if active else f"Le service ne semble pas actif (état: {state.strip() or 'inconnu'})"
+        )
+    elif action == "stop":
+        success = not active
+        msg = (out or err or "").strip() or (
+            f"Service {name} arrêté ✓" if not active else f"Le service est encore actif (état: {state.strip()})"
+        )
+    else:  # enable / disable
+        success = rc == 0
+        msg = (out or err or "").strip() or f"Action {action} exécutée"
+
     return jsonify({
-        "success": rc == 0,
-        "message": out or err or f"Action {action} exécutée",
+        "success": success,
+        "message": msg,
         "returncode": rc,
+        "active_state": state.strip(),
     })
 
 
