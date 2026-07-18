@@ -366,24 +366,70 @@ def service_action(name: str, action: str):
             "demo": True,
         })
 
+    def _wait_for_state(target_active: bool, attempts: int = 8, delay: float = 0.8) -> str:
+        """Interroge is-active jusqu'à ce que l'état corresponde ou que le délai soit dépassé."""
+        import time
+        for _ in range(attempts):
+            _, s, _ = run_cmd([SYSTEMCTL, "is-active", f"{name}.service"], timeout=4)
+            s = s.strip()
+            if target_active and s == "active":
+                return s
+            if not target_active and s in ("inactive", "dead", "failed"):
+                return s
+            if s not in ("activating", "deactivating", "reloading"):
+                # État stable inattendu — on s'arrête
+                return s
+            time.sleep(delay)
+        _, s, _ = run_cmd([SYSTEMCTL, "is-active", f"{name}.service"], timeout=4)
+        return s.strip()
+
+    # Cas spécial : le panel se redémarre lui-même → on répond d'abord,
+    # puis on lance le redémarrage dans un thread pour ne pas tuer la connexion.
+    own_service = Path("/proc/1/comm").read_text(errors="ignore").strip() != "systemd" or \
+                  os.environ.get("INVOCATION_ID")  # on est dans un service systemd
+
+    # Détecter si name est le service du panel courant
+    try:
+        my_unit = Path("/proc/self/cgroup").read_text().splitlines()
+        my_unit_name = next(
+            (l.split("/")[-1].replace(".service", "") for l in my_unit if ".service" in l), ""
+        )
+    except Exception:
+        my_unit_name = ""
+
+    is_self = bool(my_unit_name) and my_unit_name == name
+
+    if is_self and action in ("restart", "stop"):
+        import threading
+        def _delayed():
+            import time
+            time.sleep(1.5)
+            run_cmd(sudo([SYSTEMCTL, action, f"{name}.service"]), timeout=30)
+        threading.Thread(target=_delayed, daemon=True).start()
+        return jsonify({
+            "success": True,
+            "message": f"Redémarrage du panel en cours… reconnectez-vous dans 3 secondes.",
+            "self_restart": True,
+        })
+
     rc, out, err = run_cmd(sudo([SYSTEMCTL, action, f"{name}.service"]), timeout=30)
 
-    # Certains conteneurs LXC retournent rc != 0 même quand l'action réussit.
-    # On vérifie l'état réel du service plutôt que de se fier au code retour.
-    rc2, state, _ = run_cmd([SYSTEMCTL, "is-active", f"{name}.service"], timeout=5)
-    active = state.strip() == "active"
-
     if action in ("start", "restart"):
-        success = active
+        state = _wait_for_state(target_active=True)
+        success = state == "active"
         msg = (out or err or "").strip() or (
-            f"Service {name} actif ✓" if active else f"Le service ne semble pas actif (état: {state.strip() or 'inconnu'})"
+            f"Service {name} actif ✓" if success
+            else f"Le service ne semble pas actif (état: {state or 'inconnu'})"
         )
     elif action == "stop":
-        success = not active
+        state = _wait_for_state(target_active=False)
+        success = state in ("inactive", "dead", "failed")
         msg = (out or err or "").strip() or (
-            f"Service {name} arrêté ✓" if not active else f"Le service est encore actif (état: {state.strip()})"
+            f"Service {name} arrêté ✓" if success
+            else f"Le service est encore actif (état: {state})"
         )
     else:  # enable / disable
+        state = ""
         success = rc == 0
         msg = (out or err or "").strip() or f"Action {action} exécutée"
 
@@ -391,7 +437,7 @@ def service_action(name: str, action: str):
         "success": success,
         "message": msg,
         "returncode": rc,
-        "active_state": state.strip(),
+        "active_state": state,
     })
 
 
