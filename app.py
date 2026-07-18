@@ -437,17 +437,22 @@ def service_logs(name: str):
         )
         return (out2 or err2 or "").strip()
 
+    def _has_entries(text: str) -> bool:
+        """Vrai si journalctl a retourné de vraies lignes de log (pas juste '-- No entries --')."""
+        t = text.strip()
+        return bool(t) and "-- No entries --" not in t
+
     source = "journalctl"
     result = ""
 
     # 1. journalctl — dernière heure (le plus rapide même avec journal chargé)
     rc, out, err = _journalctl_fast("1 hour ago", 4)
-    if rc == 0 and out.strip():
+    if rc == 0 and _has_entries(out):
         result = out.strip()
     else:
         # 2. journalctl — 7 derniers jours
         rc, out, err = _journalctl_fast("7 days ago", 5)
-        if rc == 0 and out.strip():
+        if rc == 0 and _has_entries(out):
             result = out.strip()
         else:
             # 3. /var/log/syslog ou /var/log/messages
